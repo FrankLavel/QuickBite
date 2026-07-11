@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// Reglas de Storage de QuickBite. Solo el restaurante dueño (Dashboard Web)
+// sube/reemplaza imágenes de SU restaurante; la app móvil solo lee.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function currentUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isRestaurantOwner(restId) {
+      return isSignedIn()
+             && currentUserData().role == 'restaurant'
+             && currentUserData().restaurantId == restId;
+    }
+
+    // /users/{uid}/avatar_*.jpg — cada usuario administra su propia foto de perfil.
+    match /users/{uid}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isUser(uid);
+    }
+
+    // /restaurants/{restId}/cover.jpg, logo.jpg, products/{prodId}.jpg
+    match /restaurants/{restId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+    }
+
+    // /offers/{restId}/{offerId}.jpg — restId en la ruta para poder validar el
+    // dueño sin depender de que el documento Firestore ya exista.
+    match /offers/{restId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+    }
+  }
+}

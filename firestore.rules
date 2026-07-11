@@ -1,0 +1,162 @@
+rules_version = '2';
+
+// Reglas de seguridad de QuickBite (App Móvil + Dashboard Web del Restaurante).
+// Dos roles, ambos autenticados con Firebase Auth + Firestore (sin Admin SDK):
+//   - 'customer' (app móvil): se autoregistra, gestiona su propio perfil/pedidos/
+//     notificaciones, y solo lee catálogo/ofertas/cupones.
+//   - 'restaurant' (dashboard web): NO se autoregistra desde el cliente — su
+//     documento /users/{uid} (con role='restaurant' y restaurantId) lo provisiona
+//     el equipo del dashboard por fuera de estas reglas (Admin SDK/Cloud Function),
+//     para evitar que cualquiera se autoasigne un restaurantId. Una vez provisionado,
+//     administra su propio restaurante/menú/ofertas/cupones y el status de sus pedidos.
+// No existe rol de repartidor: el status 'on_the_way' lo asigna el propio restaurante.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function currentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // El restaurante autenticado solo administra el restaurantId que le fue asignado.
+    function isRestaurantOwner(restId) {
+      return isSignedIn()
+             && currentUserData().role == 'restaurant'
+             && currentUserData().restaurantId == restId;
+    }
+
+    // Compra verificada para reseñas: el pedido existe, es del usuario actual y
+    // está 'delivered'. (No se valida que el producto esté en items[] porque las
+    // reglas no pueden recorrer arrays de maps; eso lo garantiza el cliente.)
+    function orderIsDeliveredForUser(orderId) {
+      return exists(/databases/$(database)/documents/orders/$(orderId))
+             && get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid
+             && get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'delivered';
+    }
+
+    // Solo estos campos del perfil puede editar el cliente (nunca role/restaurantId/email/createdAt).
+    function onlyEditableUserFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken']);
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isUser(uid);
+
+      // Autoregistro: solo permite crear el propio perfil como 'customer'.
+      // Las cuentas 'restaurant' se provisionan fuera del cliente (ver nota arriba).
+      allow create: if isUser(uid)
+                    && request.resource.data.role == 'customer';
+
+      allow update: if isUser(uid) && onlyEditableUserFields();
+      // El usuario puede eliminar su propio perfil (opción "Eliminar cuenta").
+      allow delete: if isUser(uid);
+
+      // ---------- users/{uid}/notifications ----------
+      // Las crea Cloud Functions (Admin SDK). El cliente solo lee y marca isRead.
+      match /notifications/{notifId} {
+        allow read: if isUser(uid);
+        allow update: if isUser(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+        allow create, delete: if false;
+      }
+    }
+
+    // ---------- restaurants ----------
+    match /restaurants/{restId} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+
+      match /categories/{catId} {
+        allow read: if isSignedIn();
+        allow write: if isRestaurantOwner(restId);
+      }
+
+      match /products/{prodId} {
+        allow read: if isSignedIn();
+        allow write: if isRestaurantOwner(restId);
+
+        // Reseñas de producto: doc id = uid del autor (una por usuario/producto).
+        // Solo quien tiene un pedido 'delivered' propio puede crear/editar la suya.
+        match /reviews/{userId} {
+          allow read: if isSignedIn();
+          allow create, update: if isUser(userId)
+                        && request.resource.data.userId == userId
+                        && request.resource.data.rating is int
+                        && request.resource.data.rating >= 1
+                        && request.resource.data.rating <= 5
+                        && request.resource.data.comment is string
+                        && orderIsDeliveredForUser(request.resource.data.orderId);
+          allow delete: if isUser(userId);
+        }
+      }
+    }
+
+    // ---------- offers (banners promocionales) ----------
+    match /offers/{offerId} {
+      allow read: if isSignedIn();
+      allow create: if isRestaurantOwner(request.resource.data.restaurantId);
+      allow update, delete: if isRestaurantOwner(resource.data.restaurantId);
+    }
+
+    // ---------- coupons (uno por restaurante) ----------
+    match /coupons/{code} {
+      allow read: if isSignedIn();
+
+      allow create: if isRestaurantOwner(request.resource.data.restaurantId);
+
+      // El restaurante dueño edita el cupón; el cliente solo puede incrementar
+      // usedCount en exactamente 1 (al aplicarlo en su pedido).
+      allow update: if isRestaurantOwner(resource.data.restaurantId)
+                    || (isSignedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount'])
+                        && request.resource.data.usedCount == resource.data.usedCount + 1);
+
+      allow delete: if isRestaurantOwner(resource.data.restaurantId);
+    }
+
+    // ---------- orders ----------
+    match /orders/{orderId} {
+      // El cliente dueño del pedido, o el restaurante que lo recibió, pueden leerlo.
+      allow read: if isSignedIn()
+                  && (resource.data.customerId == request.auth.uid
+                      || isRestaurantOwner(resource.data.restaurantId));
+
+      // Crear: el customerId debe ser el usuario actual y el estado inicial 'pending'.
+      allow create: if isSignedIn()
+                    && request.resource.data.customerId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+
+      // Cliente: agrega/edita su calificación, o cancela el pedido mientras
+      // sigue en 'pending' (status -> 'cancelled', + cancelledAt).
+      // Restaurante: solo avanza status/estimatedTime/acceptedAt/deliveredAt
+      // (nunca items, montos, dirección o customerId).
+      allow update: if isSignedIn()
+                    && (
+                      (resource.data.customerId == request.auth.uid
+                       && (
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
+                         ||
+                         (resource.data.status == 'pending'
+                          && request.resource.data.status == 'cancelled'
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']))
+                       ))
+                      ||
+                      (isRestaurantOwner(resource.data.restaurantId)
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt']))
+                    );
+
+      allow delete: if false;
+    }
+  }
+}

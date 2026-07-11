@@ -1,0 +1,240 @@
+{
+  "_notas": [
+    "Estructura para cargar a mano en Firestore Console.",
+    "TIPOS ESPECIALES (elige el tipo correcto en la consola, no 'string'):",
+    "  - restaurants.*.location  -> geopoint  (lat, lng)",
+    "  - restaurants.*.schedule  -> map",
+    "  - coupons.*.expiresAt     -> timestamp",
+    "  - cualquier campo *Ids / cuisineTypes / tags / toppings / options -> array",
+    "Las subcolecciones (categories, products) se crean DENTRO de cada restaurante:",
+    "  restaurants/{restId}/categories/{catId} y restaurants/{restId}/products/{prodId}.",
+    "El ID del documento se indica en '_id' (no es un campo, es el nombre del doc)."
+  ],
+
+  "restaurants": [
+    {
+      "_id": "rest_emerald",
+      "name": "The Emerald Garden",
+      "description": "Cocina de autor con un toque ítalo-asiático.",
+      "cuisineTypes": ["Italian", "Asian", "Fusion"],
+      "coverImage": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+      "logoImage": "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=200",
+      "rating": 4.8,
+      "reviewCount": 532,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": 2.99,
+      "minOrder": 15,
+      "location": { "latitude": 19.4326, "longitude": -99.1332 },
+      "address": "Av. Reforma 123, Centro",
+      "deliveryZone": 8,
+      "isOpen": true,
+      "schedule": {
+        "mon": { "open": "09:00", "close": "22:00" },
+        "tue": { "open": "09:00", "close": "22:00" },
+        "wed": { "open": "09:00", "close": "22:00" },
+        "thu": { "open": "09:00", "close": "22:00" },
+        "fri": { "open": "09:00", "close": "23:00" },
+        "sat": { "open": "10:00", "close": "23:00" },
+        "sun": { "open": "10:00", "close": "21:00" }
+      },
+
+      "categories": [
+        { "_id": "cat_popular", "name": "Más populares", "order": 1, "isActive": true },
+        { "_id": "cat_mains", "name": "Platos fuertes", "order": 2, "isActive": true }
+      ],
+
+      "products": [
+        {
+          "_id": "prod_avocado_bowl",
+          "categoryId": "cat_popular",
+          "name": "Citrus Avocado Bowl",
+          "description": "Aguacate hass, espinaca baby, gajos de naranja y semillas de calabaza.",
+          "price": 18.5,
+          "imageURL": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600",
+          "isAvailable": true,
+          "toppings": [
+            { "name": "Pollo a la parrilla", "price": 3.0, "required": false, "options": [] },
+            { "name": "Extra aguacate", "price": 2.0, "required": false, "options": [] }
+          ],
+          "tags": ["vegano", "saludable"],
+          "order": 1
+        },
+        {
+          "_id": "prod_truffle_ramen",
+          "categoryId": "cat_popular",
+          "name": "Truffle Miso Ramen",
+          "description": "Caldo de 24 horas, aceite de trufa negra, huevo marinado.",
+          "price": 22.0,
+          "imageURL": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600",
+          "isAvailable": true,
+          "toppings": [
+            {
+              "name": "Nivel de picante",
+              "price": 0,
+              "required": true,
+              "options": [
+                { "name": "Suave", "price": 0 },
+                { "name": "Medio", "price": 0 },
+                { "name": "Picante", "price": 0 }
+              ]
+            }
+          ],
+          "tags": ["picante"],
+          "order": 2
+        },
+        {
+          "_id": "prod_wagyu_rib",
+          "categoryId": "cat_mains",
+          "name": "Braised Wagyu Short Rib",
+          "description": "Cocción lenta 12 horas, reducción de vino tinto y puré de chirivía.",
+          "price": 34.0,
+          "imageURL": "https://images.unsplash.com/photo-1544025162-d76694265947?w=600",
+          "isAvailable": true,
+          "toppings": [],
+          "tags": [],
+          "order": 1
+        }
+      ]
+    },
+
+    {
+      "_id": "rest_burger",
+      "name": "Burger Culture",
+      "description": "Hamburguesas artesanales y malteadas.",
+      "cuisineTypes": ["American", "Burgers"],
+      "coverImage": "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800",
+      "logoImage": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=200",
+      "rating": 4.6,
+      "reviewCount": 318,
+      "deliveryTime": "20-30 min",
+      "deliveryFee": 0,
+      "minOrder": 10,
+      "location": { "latitude": 19.4271, "longitude": -99.1676 },
+      "address": "Calle Roma 45, Condesa",
+      "deliveryZone": 6,
+      "isOpen": true,
+      "schedule": {
+        "mon": { "open": "11:00", "close": "23:00" },
+        "tue": { "open": "11:00", "close": "23:00" },
+        "wed": { "open": "11:00", "close": "23:00" },
+        "thu": { "open": "11:00", "close": "23:00" },
+        "fri": { "open": "11:00", "close": "00:00" },
+        "sat": { "open": "11:00", "close": "00:00" },
+        "sun": { "open": "12:00", "close": "22:00" }
+      },
+
+      "categories": [
+        { "_id": "cat_burgers", "name": "Hamburguesas", "order": 1, "isActive": true },
+        { "_id": "cat_sides", "name": "Acompañamientos", "order": 2, "isActive": true }
+      ],
+
+      "products": [
+        {
+          "_id": "prod_truffle_burger",
+          "categoryId": "cat_burgers",
+          "name": "Ultimate Truffle Wagyu Burger",
+          "description": "Wagyu molido en casa, aceite de trufa, gruyère añejo y aioli secreto.",
+          "price": 18.5,
+          "imageURL": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600",
+          "isAvailable": true,
+          "toppings": [
+            { "name": "Tocino ahumado", "price": 2.0, "required": false, "options": [] },
+            { "name": "Pan sin gluten", "price": 1.0, "required": false, "options": [] }
+          ],
+          "tags": [],
+          "order": 1
+        },
+        {
+          "_id": "prod_quinoa_bowl",
+          "categoryId": "cat_burgers",
+          "name": "Rainbow Quinoa Bowl",
+          "description": "Quinoa, vegetales rostizados y aderezo de tahini.",
+          "price": 12.0,
+          "imageURL": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600",
+          "isAvailable": true,
+          "toppings": [],
+          "tags": ["vegano", "sin gluten"],
+          "order": 2
+        },
+        {
+          "_id": "prod_parmesan_fries",
+          "categoryId": "cat_sides",
+          "name": "Parmesan Truffle Fries",
+          "description": "Papas a la francesa con parmesano y aceite de trufa.",
+          "price": 6.5,
+          "imageURL": "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600",
+          "isAvailable": true,
+          "toppings": [],
+          "tags": [],
+          "order": 1
+        }
+      ]
+    }
+  ],
+
+  "coupons": [
+    {
+      "_id": "QUICK10",
+      "restaurantId": "rest_emerald",
+      "type": "percent",
+      "value": 10,
+      "minOrder": 15,
+      "maxUses": 1000,
+      "usedCount": 0,
+      "expiresAt": "2027-12-31T23:59:59Z",
+      "isActive": true
+    },
+    {
+      "_id": "BIENVENIDO",
+      "restaurantId": "rest_burger",
+      "type": "fixed",
+      "value": 5,
+      "minOrder": 20,
+      "maxUses": 500,
+      "usedCount": 0,
+      "expiresAt": "2027-12-31T23:59:59Z",
+      "isActive": true
+    }
+  ],
+
+  "offers": [
+    {
+      "_id": "offer_emerald_signature",
+      "restaurantId": "rest_emerald",
+      "badge": "FLASH SALE",
+      "title": "20% en platos de autor",
+      "description": "Solo por hoy en The Emerald Garden",
+      "image": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800",
+      "couponCode": "QUICK10",
+      "isActive": true
+    },
+    {
+      "_id": "offer_emerald_ramen",
+      "restaurantId": "rest_emerald",
+      "badge": "NUEVO",
+      "title": "Prueba el Truffle Miso Ramen",
+      "description": "Caldo de 24 horas con trufa negra",
+      "image": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800",
+      "isActive": true
+    },
+    {
+      "_id": "offer_burger_welcome",
+      "restaurantId": "rest_burger",
+      "badge": "BIENVENIDA",
+      "title": "$5 de descuento",
+      "description": "En tu primer pedido en Burger Culture",
+      "image": "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800",
+      "couponCode": "BIENVENIDO",
+      "isActive": true
+    },
+    {
+      "_id": "offer_burger_freedelivery",
+      "restaurantId": "rest_burger",
+      "badge": "ENVÍO GRATIS",
+      "title": "Sin costo de envío",
+      "description": "Burger Culture entrega gratis hoy",
+      "image": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=800",
+      "isActive": true
+    }
+  ]
+}
