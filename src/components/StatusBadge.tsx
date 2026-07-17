@@ -16,6 +16,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   on_the_way: { bg: colors.infoSoft, text: colors.info },
   delivered: { bg: colors.surfaceMuted, text: colors.textSecondary },
   rejected: { bg: colors.dangerSoft, text: colors.danger },
+  cancelled: { bg: colors.dangerSoft, text: colors.danger },
 };
 
 interface StatusBadgeProps {

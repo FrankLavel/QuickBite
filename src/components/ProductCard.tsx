@@ -4,14 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { Product } from '../types/product';
 import { ProductImage } from './ProductImage';
@@ -26,6 +19,23 @@ interface ProductCardProps {
   onDelete: () => void;
 }
 
+/** Colores de badge por categoría (determinista según el nombre). */
+const CATEGORY_COLORS = [
+  colors.primary,
+  colors.info,
+  '#DB2777',
+  colors.warning,
+  '#7C3AED',
+  '#0891B2',
+];
+
+function categoryColor(name?: string): string {
+  if (!name) return colors.primary;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return CATEGORY_COLORS[hash % CATEGORY_COLORS.length];
+}
+
 export function ProductCard({
   product,
   categoryName,
@@ -34,10 +44,7 @@ export function ProductCard({
   onToggleAvailable,
   onDelete,
 }: ProductCardProps) {
-  const tagsPreview =
-    product.tags.length > 0
-      ? product.tags.slice(0, 3).join(' · ')
-      : null;
+  const available = product.isAvailable;
 
   return (
     <View style={[styles.card, width ? { width } : undefined]}>
@@ -45,14 +52,17 @@ export function ProductCard({
         <ProductImage
           uri={product.imageURL}
           style={styles.image}
-          dimmed={!product.isAvailable}
+          dimmed={!available}
         />
 
         {categoryName ? (
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>
-              {categoryName.toUpperCase()}
-            </Text>
+          <View
+            style={[
+              styles.categoryBadge,
+              { backgroundColor: categoryColor(categoryName) },
+            ]}
+          >
+            <Text style={styles.categoryText}>{categoryName.toUpperCase()}</Text>
           </View>
         ) : null}
 
@@ -60,11 +70,12 @@ export function ProductCard({
           style={styles.editBtn}
           onPress={onPress}
           activeOpacity={0.85}
+          accessibilityLabel="Editar platillo"
         >
           <Feather name="edit-2" size={15} color={colors.text} />
         </TouchableOpacity>
 
-        {!product.isAvailable ? (
+        {!available ? (
           <View style={styles.outOfStockOverlay}>
             <View style={styles.outOfStockBadge}>
               <Text style={styles.outOfStockText}>AGOTADO</Text>
@@ -81,36 +92,45 @@ export function ProductCard({
           <Text style={styles.price}>${product.price.toFixed(2)}</Text>
         </View>
 
-        <Text style={styles.description} numberOfLines={3}>
+        <Text style={styles.description} numberOfLines={2}>
           {product.description || 'Sin descripción del platillo.'}
         </Text>
-
-        {tagsPreview ? (
-          <Text style={styles.tags} numberOfLines={1}>
-            {tagsPreview}
-          </Text>
-        ) : null}
       </View>
 
       <View style={styles.footer}>
         <View style={styles.switchRow}>
-          <Text style={styles.availableLabel}>Disponible</Text>
           <Switch
-            value={product.isAvailable}
+            value={available}
             onValueChange={onToggleAvailable}
             trackColor={{ false: colors.border, true: colors.primaryLight }}
-            thumbColor={
-              product.isAvailable ? colors.primary : colors.textMuted
-            }
+            thumbColor={available ? colors.primary : colors.textMuted}
           />
+          <Text
+            style={[
+              styles.availableLabel,
+              { color: available ? colors.primary : colors.textMuted },
+            ]}
+          >
+            {available ? 'Disponible' : 'No disponible'}
+          </Text>
         </View>
 
         <View style={styles.actions}>
-          <Pressable onPress={onPress} hitSlop={8} style={styles.actionBtn}>
-            <Feather name="eye" size={16} color={colors.textSecondary} />
+          <Pressable
+            onPress={onPress}
+            hitSlop={8}
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+            accessibilityLabel="Ver / editar"
+          >
+            <Feather name="eye" size={17} color={colors.textSecondary} />
           </Pressable>
-          <Pressable onPress={onDelete} hitSlop={8} style={styles.actionBtn}>
-            <Feather name="trash-2" size={16} color={colors.danger} />
+          <Pressable
+            onPress={onDelete}
+            hitSlop={8}
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+            accessibilityLabel="Eliminar platillo"
+          >
+            <Feather name="trash-2" size={17} color={colors.danger} />
           </Pressable>
         </View>
       </View>
@@ -131,7 +151,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     position: 'relative',
-    height: 170,
+    height: 168,
     backgroundColor: colors.surfaceMuted,
   },
   image: { width: '100%', height: '100%' },
@@ -139,16 +159,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.sm,
     left: spacing.sm,
-    backgroundColor: colors.primary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.full,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   categoryText: {
     fontSize: 10,
     color: colors.textOnPrimary,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   editBtn: {
     position: 'absolute',
@@ -164,12 +187,12 @@ const styles = StyleSheet.create({
   },
   outOfStockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(31, 41, 55, 0.35)',
+    backgroundColor: 'rgba(31, 41, 55, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   outOfStockBadge: {
-    backgroundColor: colors.danger,
+    backgroundColor: colors.textSecondary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,
@@ -180,7 +203,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.5,
   },
-  content: { padding: spacing.md },
+  content: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -191,6 +214,7 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text,
     flex: 1,
+    fontWeight: '700',
   },
   price: {
     ...typography.h3,
@@ -202,13 +226,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
     lineHeight: 18,
-    minHeight: 54,
-  },
-  tags: {
-    ...typography.caption,
-    color: colors.primaryLight,
-    marginTop: spacing.xs,
-    fontWeight: '600',
+    minHeight: 36,
   },
   footer: {
     flexDirection: 'row',
@@ -218,31 +236,30 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
   },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   availableLabel: {
     ...typography.caption,
-    color: colors.text,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+  },
+  actionBtnPressed: {
+    backgroundColor: colors.surfaceMuted,
   },
 });

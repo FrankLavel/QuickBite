@@ -27,6 +27,8 @@ interface ModalFormShellProps {
   children: React.ReactNode;
   /** Texto opcional bajo el título */
   subtitle?: string;
+  /** Ancho máximo del modal (para formularios anchos de 2 columnas). */
+  maxWidth?: number;
 }
 
 export function ModalFormShell({
@@ -34,9 +36,10 @@ export function ModalFormShell({
   onClose,
   children,
   subtitle,
+  maxWidth = FORM_MODAL_MAX_WIDTH,
 }: ModalFormShellProps) {
   const { width } = useWindowDimensions();
-  const cardWidth = Math.min(width - spacing.lg * 2, FORM_MODAL_MAX_WIDTH);
+  const cardWidth = Math.min(width - spacing.lg * 2, maxWidth);
 
   return (
     <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
@@ -46,7 +49,7 @@ export function ModalFormShell({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         pointerEvents="box-none"
       >
-        <View style={[styles.card, { width: cardWidth, maxWidth: FORM_MODAL_MAX_WIDTH }]}>
+        <View style={[styles.card, { width: cardWidth, maxWidth }]}>
           <View style={styles.header}>
             <View style={styles.headerText}>
               <Text style={styles.title}>{title}</Text>

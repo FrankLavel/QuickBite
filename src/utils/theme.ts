@@ -18,9 +18,11 @@ export const colors = {
   black: '#1f2937',
   blackSoft: '#374151',
 
-  background: '#eef8f1',
+  /** Fondo de página neutro (estilo mockup) — el verde queda para acentos. */
+  background: '#F4F6F8',
   surface: '#FFFFFF',
-  surfaceMuted: '#eef8f1',
+  /** Rellenos suaves neutros (chips inactivos, botones sutiles). */
+  surfaceMuted: '#EDF0F4',
   inputBackground: '#FFFFFF',
   sidebar: '#086931',
 
@@ -72,11 +74,11 @@ export const typography = {
 
 export const shadows = {
   card: {
-    shadowColor: '#1f2937',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 16,
+    elevation: 3,
   },
   fab: {
     shadowColor: '#086931',

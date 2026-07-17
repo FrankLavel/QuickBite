@@ -152,18 +152,32 @@ export function MenuScreen() {
         </View>
 
         <View style={styles.metrics}>
-          <MetricCard label="Total platillos" value={String(products.length)} />
-          <MetricCard label="Categorías" value={String(categories.length)} />
+          <MetricCard
+            label="Total platillos"
+            value={String(products.length)}
+            icon="grid"
+            tone="primary"
+          />
+          <MetricCard
+            label="Categorías activas"
+            value={String(categories.length)}
+            icon="layers"
+            tone="info"
+          />
           <MetricCard
             label="Agotados"
             value={String(outOfStock)}
+            icon="alert-triangle"
+            tone="danger"
             danger={outOfStock > 0}
-            hint={outOfStock > 0 ? 'Requiere atención' : undefined}
+            badge={outOfStock > 0 ? 'Requiere atención' : undefined}
+            badgeTone="priority"
           />
           <MetricCard
             label="Precio promedio"
             value={`$${avgPrice.toFixed(2)}`}
-            accent
+            icon="tag"
+            tone="success"
           />
         </View>
 

@@ -34,6 +34,9 @@ export interface Product {
   toppings: Topping[];
   tags: string[];
   order: number;
+  /** Promedio de reseñas (0-5), calculado por Cloud Function. Solo lectura. */
+  rating?: number;
+  reviewCount?: number;
 }
 
 /** Formulario de alta/edición de producto */

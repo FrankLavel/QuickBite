@@ -50,6 +50,8 @@ export interface Order {
   createdAt?: unknown;
   acceptedAt?: unknown;
   deliveredAt?: unknown;
-  /** Campos auxiliares para UI (no siempre en Firestore) */
+  cancelledAt?: unknown;
+  /** Denormalizados en el pedido por la app cliente (para mostrar/contactar). */
   customerName?: string;
+  customerPhone?: string;
 }

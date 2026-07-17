@@ -39,6 +39,8 @@ export const ORDER_STATUS = {
   ON_THE_WAY: 'on_the_way',
   DELIVERED: 'delivered',
   REJECTED: 'rejected',
+  /** El cliente canceló el pedido (solo mientras estaba 'pending'). */
+  CANCELLED: 'cancelled',
 } as const;
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -49,6 +51,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   on_the_way: 'En camino',
   delivered: 'Entregado',
   rejected: 'Rechazado',
+  cancelled: 'Cancelado',
 };
 
 /**

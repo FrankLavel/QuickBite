@@ -23,6 +23,8 @@ function mapOrder(id: string, data: Record<string, unknown>): Order {
   return {
     id,
     customerId: (data.customerId as string) ?? '',
+    customerName: data.customerName as string | undefined,
+    customerPhone: data.customerPhone as string | undefined,
     restaurantId: (data.restaurantId as string) ?? '',
     status: (data.status as OrderStatus) ?? ORDER_STATUS.PENDING,
     items: (data.items as Order['items']) ?? [],
