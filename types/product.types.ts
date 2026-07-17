@@ -34,4 +34,8 @@ export interface Product {
   tags: string[];
   /** Orden dentro de la categoría. */
   order: number;
+  /** Calificación promedio del platillo (0-5), calculada de sus reseñas por Cloud Function. */
+  rating?: number;
+  /** Número de reseñas del platillo. */
+  reviewCount?: number;
 }

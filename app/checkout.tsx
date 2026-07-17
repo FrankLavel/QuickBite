@@ -80,6 +80,9 @@ export default function CheckoutScreen() {
 
     const input: NewOrderInput = {
       customerId: user.uid,
+      // Nombre y teléfono denormalizados para que el restaurante los vea/contacte.
+      ...(user.name?.trim() ? { customerName: user.name.trim() } : {}),
+      ...(user.phone?.trim() ? { customerPhone: user.phone.trim() } : {}),
       restaurantId,
       items: orderItems,
       subtotal: round2(subtotal),

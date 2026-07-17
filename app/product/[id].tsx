@@ -9,6 +9,7 @@ import { useProduct } from '@/hooks/useProduct';
 import { useCart } from '@/hooks/useCart';
 import { cartLineId } from '@/store/cartStore';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useProductReviews } from '@/hooks/useProductReviews';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ProductReviewsSection } from '@/components/product/ProductReviewsSection';
 
@@ -20,16 +21,26 @@ const cardShadow = {
 };
 
 export default function ProductScreen() {
-  const { id, restaurantId } = useLocalSearchParams<{ id: string; restaurantId: string }>();
+  const { id, restaurantId, editLineId } = useLocalSearchParams<{
+    id: string;
+    restaurantId: string;
+    editLineId?: string;
+  }>();
   const router = useRouter();
   const { product, restaurant, loading } = useProduct(restaurantId, id);
-  const { addItem } = useCart();
+  const { addItem, removeItem, items } = useCart();
   const { isFavoriteProduct, toggleFavoriteProduct } = useFavorites();
   const { t } = useTranslation();
 
-  const [quantity, setQuantity] = useState(1);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
+  // Modo edición: si venimos del carrito con editLineId, precargamos esa línea
+  // (cantidad, toppings, nota) y al guardar la reemplazamos en vez de duplicarla.
+  const editItem = editLineId ? items.find((i) => i.id === editLineId) : undefined;
+
+  const [quantity, setQuantity] = useState(editItem?.quantity ?? 1);
+  const [selected, setSelected] = useState<string[]>(
+    editItem?.toppings?.map((tp) => tp.name) ?? []
+  );
+  const [notes, setNotes] = useState(editItem?.notes ?? '');
   const scrollRef = useRef<ScrollView>(null);
   // Offsets dentro del ScrollView para desplazar el campo de notas a la vista.
   // Usamos onLayout en vez de measureLayout: en la Nueva Arquitectura (Fabric)
@@ -58,6 +69,15 @@ export default function ProductScreen() {
     return (product.price + toppingsTotal) * quantity;
   }, [product, selected, quantity]);
 
+  // Reseñas del platillo → promedio individual (se calcula aquí y se pasa a la
+  // sección para no cargarlas dos veces).
+  const reviewsData = useProductReviews(restaurantId, id);
+  const reviewCount = reviewsData.reviews.length;
+  const productRating =
+    reviewCount > 0
+      ? reviewsData.reviews.reduce((s, r) => s + r.rating, 0) / reviewCount
+      : 0;
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-background items-center justify-center">
@@ -83,6 +103,9 @@ export default function ProductScreen() {
       .filter((t) => selected.includes(t.name))
       .map((t) => ({ name: t.name, price: t.price }));
     const trimmedNotes = notes.trim();
+    // En modo edición, quitamos la línea original antes de agregar la actualizada
+    // (así se reemplaza en lugar de crear una línea duplicada en el carrito).
+    if (editLineId) removeItem(editLineId);
     addItem(
       {
         id: cartLineId(product.id, chosenToppings, trimmedNotes),
@@ -96,7 +119,8 @@ export default function ProductScreen() {
       },
       restaurant.id
     );
-    router.push('/cart');
+    if (editLineId) router.back();
+    else router.push('/cart');
   };
 
   return (
@@ -127,9 +151,11 @@ export default function ProductScreen() {
             <Image source={{ uri: product.imageURL }} className="w-full h-full" resizeMode="cover" />
           )}
           <View className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full flex-row items-center gap-1" style={cardShadow}>
-            <Icon name="star" color={palette.star} size={18} />
+            <Icon name={reviewCount > 0 ? 'star' : 'star-border'} color={palette.star} size={18} />
             <Text className="text-sm font-bold text-on-surface">
-              {restaurant.rating.toFixed(1)} ({restaurant.reviewCount}+)
+              {reviewCount > 0
+                ? `${productRating.toFixed(1)} (${reviewCount})`
+                : t('product.noReviews')}
             </Text>
           </View>
         </View>
@@ -243,7 +269,11 @@ export default function ProductScreen() {
           </View>
 
           {/* Reseñas del producto */}
-          <ProductReviewsSection restaurantId={restaurant.id} productId={product.id} />
+          <ProductReviewsSection
+            restaurantId={restaurant.id}
+            productId={product.id}
+            data={reviewsData}
+          />
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
@@ -258,7 +288,11 @@ export default function ProductScreen() {
             style={{ shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 30, shadowOffset: { width: 0, height: 8 } }}
           >
             <Icon name="shopping-basket" color="#ffffff" />
-            <Text className="text-white font-bold text-lg">{t('product.addToCart', { price: total.toFixed(2) })}</Text>
+            <Text className="text-white font-bold text-lg">
+              {t(editLineId ? 'product.updateCart' : 'product.addToCart', {
+                price: total.toFixed(2),
+              })}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

@@ -21,6 +21,7 @@ export interface Coupon {
   maxUses: number;
   /** Usos actuales. La app verifica que usedCount < maxUses. */
   usedCount: number;
-  expiresAt: Timestamp;
+  /** Fecha de expiración, o null si el cupón no vence. */
+  expiresAt: Timestamp | null;
   isActive: boolean;
 }

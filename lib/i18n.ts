@@ -164,6 +164,11 @@ const es: Record<string, string> = {
   'orders.track': 'Seguir',
   'orders.reorder': 'Reordenar',
   'orders.totalPrice': 'Total',
+  'receipt.title': 'Recibo del pedido',
+  'receipt.deliverTo': 'Entregar en',
+  'receipt.payCash': 'Efectivo',
+  'receipt.payCard': 'Tarjeta',
+  'receipt.payPaypal': 'PayPal',
   'orders.empty': 'Aún no hay pedidos',
   'orders.emptyDesc': 'Parece que no has hecho pedidos en esta categoría.',
   'orders.browse': 'Ver restaurantes',
@@ -209,6 +214,10 @@ const es: Record<string, string> = {
   'notifications.earlier': 'ANTERIORES',
   'notifications.trackOrder': 'Ver pedido',
   'notifications.empty': 'No tienes notificaciones.',
+  'notifications.clearAll': 'Borrar todas',
+  'notifications.clearTitle': 'Borrar notificaciones',
+  'notifications.clearMsg': '¿Borrar todas tus notificaciones? Esta acción no se puede deshacer.',
+  'notifications.deleteOne': 'Borrar notificación',
 
   // Restaurante
   'restaurant.notFound': 'Restaurante no encontrado.',
@@ -231,6 +240,8 @@ const es: Record<string, string> = {
   'product.specialInstructions': 'Instrucciones especiales',
   'product.instructionsPlaceholder': 'Ej: sin cebolla, servilletas extra...',
   'product.addToCart': 'Agregar — ${price}',
+  'product.updateCart': 'Actualizar — ${price}',
+  'product.noReviews': 'Nuevo',
 
   // Carrito
   'cart.empty': 'Tu carrito está vacío',
@@ -565,6 +576,11 @@ const en: Record<string, string> = {
   'orders.track': 'Track',
   'orders.reorder': 'Reorder',
   'orders.totalPrice': 'Total Price',
+  'receipt.title': 'Order receipt',
+  'receipt.deliverTo': 'Deliver to',
+  'receipt.payCash': 'Cash',
+  'receipt.payCard': 'Card',
+  'receipt.payPaypal': 'PayPal',
   'orders.empty': 'No orders yet',
   'orders.emptyDesc': "It looks like you haven't placed any orders in this category.",
   'orders.browse': 'Browse Restaurants',
@@ -610,6 +626,10 @@ const en: Record<string, string> = {
   'notifications.earlier': 'EARLIER',
   'notifications.trackOrder': 'Track Order',
   'notifications.empty': 'You have no notifications.',
+  'notifications.clearAll': 'Clear all',
+  'notifications.clearTitle': 'Clear notifications',
+  'notifications.clearMsg': 'Delete all your notifications? This cannot be undone.',
+  'notifications.deleteOne': 'Delete notification',
 
   // Restaurant
   'restaurant.notFound': 'Restaurant not found.',
@@ -632,6 +652,8 @@ const en: Record<string, string> = {
   'product.specialInstructions': 'Special Instructions',
   'product.instructionsPlaceholder': 'E.g., no onions, extra napkins...',
   'product.addToCart': 'Add to Cart — ${price}',
+  'product.updateCart': 'Update — ${price}',
+  'product.noReviews': 'New',
 
   // Cart
   'cart.empty': 'Your cart is empty',

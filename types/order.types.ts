@@ -45,6 +45,11 @@ export interface Order {
   id: string;
   /** Siempre = auth.uid del usuario actual. */
   customerId: string;
+  /** Nombre del cliente, denormalizado para que el dashboard lo muestre
+   *  (el restaurante no puede leer users/{customerId} por las reglas). */
+  customerName?: string;
+  /** Teléfono del cliente, denormalizado para que el restaurante lo contacte. */
+  customerPhone?: string;
   restaurantId: string;
   status: OrderStatus;
   items: OrderItem[];
@@ -86,7 +91,7 @@ export type NewOrderInput = Pick<
   | 'paymentMethod'
   | 'couponCode'
 > &
-  Partial<Pick<Order, 'specialInstructions'>>;
+  Partial<Pick<Order, 'specialInstructions' | 'customerName' | 'customerPhone'>>;
 
 /**
  * Estado local del carrito (antes del checkout). No es una colección de

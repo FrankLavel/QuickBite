@@ -138,13 +138,14 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       {/* TopAppBar */}
       <View className="flex-row justify-between items-center px-4 py-2 bg-background">
+        <Text className="text-xl font-bold text-primary tracking-tight">QuickBite</Text>
         <TouchableOpacity
           onPress={() => setAddressSheetVisible(true)}
           activeOpacity={0.7}
-          className="flex-row items-center gap-1 flex-1"
+          className="flex-row items-center gap-1"
         >
           <Icon name="location-on" color={palette.primary} />
-          <View className="flex-1">
+          <View>
             <Text className="text-xs text-on-surface-variant">{t('home.deliverTo')}</Text>
             <View className="flex-row items-center gap-1">
               <Text className="text-sm font-bold text-on-surface" numberOfLines={1}>
@@ -153,16 +154,6 @@ export default function HomeScreen() {
               <Icon name="keyboard-arrow-down" color={palette.onSurface} size={18} />
             </View>
           </View>
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-primary tracking-tight">QuickBite</Text>
-        <TouchableOpacity
-          onPress={() => setFiltersVisible(true)}
-          activeOpacity={0.7}
-          className="p-1 rounded-full"
-          accessibilityRole="button"
-          accessibilityLabel={t('a11y.filters')}
-        >
-          <Icon name="tune" color={palette.primary} />
         </TouchableOpacity>
       </View>
 

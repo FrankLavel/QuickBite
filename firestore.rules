@@ -67,7 +67,9 @@ service cloud.firestore {
         allow read: if isUser(uid);
         allow update: if isUser(uid)
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-        allow create, delete: if false;
+        allow create: if false;
+        // El cliente puede borrar sus propias notificaciones (limpiar historial).
+        allow delete: if isUser(uid);
       }
     }
 

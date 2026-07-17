@@ -25,5 +25,13 @@ export function useNotifications() {
     if (user) notificationsService.markAsRead(user.uid, id);
   };
 
-  return { notifications, loading, markAsRead };
+  const remove = (id: string) => {
+    if (user) notificationsService.deleteNotification(user.uid, id);
+  };
+
+  const clearAll = async () => {
+    if (user) await notificationsService.deleteAllNotifications(user.uid);
+  };
+
+  return { notifications, loading, markAsRead, remove, clearAll };
 }

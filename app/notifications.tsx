@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Icon, IconName } from '@/components/ui/Icon';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { palette } from '@/constants/colors';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -43,10 +45,26 @@ function badgeFor(type: NotificationType): Badge {
   }
 }
 
+/** Fondo rojo con ícono de basura que se revela al deslizar la tarjeta. */
+function SwipeDeleteAction({ align }: { align: 'left' | 'right' }) {
+  return (
+    <View
+      className={`bg-error rounded-xl justify-center ${
+        align === 'right' ? 'items-end pr-6' : 'items-start pl-6'
+      }`}
+      style={{ flex: 1 }}
+    >
+      <Icon name="delete" color="#ffffff" size={24} />
+    </View>
+  );
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('All');
-  const { notifications, loading, markAsRead } = useNotifications();
+  const [confirmClear, setConfirmClear] = useState(false);
+  const { notifications, loading, markAsRead, remove, clearAll } =
+    useNotifications();
   const { t, lang } = useTranslation();
 
   const filtered =
@@ -66,13 +84,20 @@ export default function NotificationsScreen() {
         })
       : '';
     return (
-      <TouchableOpacity
+      <Swipeable
         key={n.id}
-        activeOpacity={0.9}
-        onPress={() => !n.isRead && markAsRead(n.id)}
-        className="bg-surface-container-lowest rounded-xl p-4 flex-row gap-4 relative overflow-hidden"
-        style={[cardShadow, n.isRead ? { opacity: 0.8 } : null]}
+        renderRightActions={() => <SwipeDeleteAction align="right" />}
+        renderLeftActions={() => <SwipeDeleteAction align="left" />}
+        onSwipeableOpen={() => remove(n.id)}
+        overshootLeft={false}
+        overshootRight={false}
       >
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => !n.isRead && markAsRead(n.id)}
+          className="bg-surface-container-lowest rounded-xl p-4 flex-row gap-4 relative overflow-hidden"
+          style={[cardShadow, n.isRead ? { opacity: 0.8 } : null]}
+        >
         {!n.isRead && <View className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
         <View className={`w-12 h-12 rounded-full items-center justify-center ${badge.bg}`}>
           <Icon name={badge.icon} color={badge.color} />
@@ -94,7 +119,8 @@ export default function NotificationsScreen() {
             </View>
           )}
         </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -114,6 +140,20 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
           <Text className="text-xl font-bold text-primary">{t('notifications.title')}</Text>
         </View>
+        {notifications.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setConfirmClear(true)}
+            activeOpacity={0.7}
+            className="flex-row items-center gap-1 px-3 py-2 rounded-full"
+            accessibilityRole="button"
+            accessibilityLabel={t('notifications.clearAll')}
+          >
+            <Icon name="delete" color={palette.error} size={20} />
+            <Text className="text-error text-sm font-bold">
+              {t('notifications.clearAll')}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View className="px-4 pt-4">
@@ -164,6 +204,20 @@ export default function NotificationsScreen() {
           )}
         </ScrollView>
       )}
+
+      <ConfirmDialog
+        visible={confirmClear}
+        title={t('notifications.clearTitle')}
+        message={t('notifications.clearMsg')}
+        confirmLabel={t('notifications.clearAll')}
+        cancelLabel={t('common.cancel')}
+        destructive
+        onConfirm={() => {
+          setConfirmClear(false);
+          clearAll();
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </SafeAreaView>
   );
 }

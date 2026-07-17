@@ -6,6 +6,7 @@ import {
   doc,
   getDocs,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   query,
   orderBy,
@@ -61,4 +62,14 @@ export const notificationsService = {
   /** El cliente solo puede marcar isRead = true. */
   markAsRead: (uid: string, notifId: string) =>
     updateDoc(doc(db, 'users', uid, 'notifications', notifId), { isRead: true }),
+
+  /** Borra una notificación del historial del usuario. */
+  deleteNotification: (uid: string, notifId: string) =>
+    deleteDoc(doc(db, 'users', uid, 'notifications', notifId)),
+
+  /** Borra todas las notificaciones del usuario. */
+  deleteAllNotifications: async (uid: string): Promise<void> => {
+    const snap = await getDocs(notifsCol(uid));
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  },
 };

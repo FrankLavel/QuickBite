@@ -153,7 +153,9 @@ export default function CartScreen() {
                 activeOpacity={0.95}
                 onPress={() =>
                   restaurantId &&
-                  router.push(`/product/${item.productId}?restaurantId=${restaurantId}`)
+                  router.push(
+                    `/product/${item.productId}?restaurantId=${restaurantId}&editLineId=${encodeURIComponent(item.id)}`
+                  )
                 }
                 className="bg-surface-container-lowest rounded-xl p-4 flex-row gap-4 items-center"
                 style={cardShadow}

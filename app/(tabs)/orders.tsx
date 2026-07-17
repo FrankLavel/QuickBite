@@ -9,6 +9,7 @@ import { palette } from '@/constants/colors';
 import { useOrders } from '@/hooks/useOrders';
 import { useTranslation } from '@/hooks/useTranslation';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
+import { OrderReceiptSheet } from '@/components/order/OrderReceiptSheet';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ordersService } from '@/services/orders.service';
 import { restaurantsService } from '@/services/restaurants.service';
@@ -48,6 +49,8 @@ export default function OrdersScreen() {
 
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [reorderNotice, setReorderNotice] = useState<ReorderNotice | null>(null);
+
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   const goToCart = (items: CartItemType[], restaurantId: string) => {
     reorder(items, restaurantId);
@@ -130,7 +133,13 @@ export default function OrdersScreen() {
     const isActive = tab === 'Active';
 
     return (
-      <View key={order.id} className="bg-surface-container-lowest rounded-xl p-4" style={cardShadow}>
+      <TouchableOpacity
+        key={order.id}
+        onPress={() => setReceiptOrder(order)}
+        activeOpacity={0.92}
+        className="bg-surface-container-lowest rounded-xl p-4"
+        style={cardShadow}
+      >
         {/* Header */}
         <View className="flex-row justify-between items-start mb-4">
           <View className="flex-row gap-4 items-center flex-1 pr-2">
@@ -204,7 +213,7 @@ export default function OrdersScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -314,6 +323,14 @@ export default function OrdersScreen() {
         hideCancel
         onConfirm={() => setReorderNotice(null)}
         onCancel={() => setReorderNotice(null)}
+      />
+
+      <OrderReceiptSheet
+        order={receiptOrder}
+        restaurantName={
+          receiptOrder ? restaurants[receiptOrder.restaurantId]?.name : undefined
+        }
+        onClose={() => setReceiptOrder(null)}
       />
     </SafeAreaView>
   );

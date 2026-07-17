@@ -22,14 +22,20 @@ function Stars({ rating, size = 16 }: { rating: number; size?: number }) {
 export function ProductReviewsSection({
   restaurantId,
   productId,
+  data,
 }: {
   restaurantId: string;
   productId: string;
+  data: ReturnType<typeof useProductReviews>;
 }) {
   const { t, lang } = useTranslation();
-  const { reviews, myReview, eligibleOrderId, canReview, loading, reload } =
-    useProductReviews(restaurantId, productId);
+  const { reviews, myReview, eligibleOrderId, canReview, loading, reload } = data;
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  const avg =
+    reviews.length > 0
+      ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+      : 0;
 
   const renderReview = (r: ProductReview) => {
     const dateLabel = r.createdAt
@@ -63,9 +69,18 @@ export function ProductReviewsSection({
   return (
     <View className="mt-8">
       <View className="flex-row items-center justify-between mb-2">
-        <Text className="text-sm font-bold uppercase tracking-wider text-secondary">
-          {t('reviews.title')} {reviews.length > 0 ? `(${reviews.length})` : ''}
-        </Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm font-bold uppercase tracking-wider text-secondary">
+            {t('reviews.title')}
+          </Text>
+          {reviews.length > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Icon name="star" color={palette.star} size={15} />
+              <Text className="text-sm font-bold text-on-surface">{avg.toFixed(1)}</Text>
+              <Text className="text-xs text-on-surface-variant">({reviews.length})</Text>
+            </View>
+          )}
+        </View>
         {canReview && (
           <TouchableOpacity
             onPress={() => setSheetOpen(true)}

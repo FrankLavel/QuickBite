@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -41,6 +41,7 @@ export default function FavoritesScreen() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [meals, setMeals] = useState<FavMeal[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(true);
+  const [restaurantNames, setRestaurantNames] = useState<Record<string, string>>({});
 
   const favKey = favoriteIds.join(',');
   useEffect(() => {
@@ -76,6 +77,24 @@ export default function FavoritesScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mealKey]);
+
+  // Nombres de restaurante de los platillos favoritos (para dar contexto).
+  useEffect(() => {
+    const ids = [...new Set(meals.map((m) => m.restaurantId))];
+    if (ids.length === 0) return;
+    let active = true;
+    restaurantsService.getByIds(ids).then((rs) => {
+      if (!active) return;
+      const map: Record<string, string> = {};
+      rs.forEach((r) => {
+        map[r.id] = r.name;
+      });
+      setRestaurantNames(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [meals]);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -195,34 +214,43 @@ export default function FavoritesScreen() {
             {meals.map(({ product, restaurantId }) => (
               <TouchableOpacity
                 key={`${restaurantId}|${product.id}`}
-                activeOpacity={0.95}
+                activeOpacity={0.92}
                 onPress={() => router.push(`/product/${product.id}?restaurantId=${restaurantId}`)}
-                className="w-[47%] bg-surface-container-lowest rounded-2xl overflow-hidden"
+                className="w-[47%] bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/15"
                 style={cardShadow}
               >
-                <View className="h-40 relative">
-                  {!!product.imageURL && (
-                    <Image source={{ uri: product.imageURL }} className="w-full h-full" resizeMode="cover" />
-                  )}
+                <View className="h-36 relative">
+                  <RemoteImage uri={product.imageURL} className="w-full h-full" fallbackIcon="restaurant" />
                   <TouchableOpacity
                     onPress={() => toggleFavoriteProduct(restaurantId, product.id)}
-                    className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full"
+                    className="absolute top-2 right-2 bg-white/90 w-8 h-8 rounded-full items-center justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('a11y.favoriteRemove')}: ${product.name}`}
                   >
-                    <Icon name="favorite" color={palette.error} size={20} />
+                    <Icon name="favorite" color={palette.error} size={18} />
                   </TouchableOpacity>
+                  {typeof product.rating === 'number' && product.rating > 0 && (
+                    <View className="absolute bottom-2 left-2 bg-white/90 px-2 py-0.5 rounded-full flex-row items-center gap-1">
+                      <Icon name="star" color={palette.star} size={13} />
+                      <Text className="text-[11px] font-bold text-on-surface">{product.rating.toFixed(1)}</Text>
+                    </View>
+                  )}
                 </View>
-                <View className="p-2">
-                  <Text className="text-base font-bold text-on-background" numberOfLines={1}>
+                <View className="p-3">
+                  <Text className="text-base font-bold text-on-surface" numberOfLines={1}>
                     {product.name}
                   </Text>
-                  <Text className="text-sm text-on-surface-variant mt-1">${product.price.toFixed(2)}</Text>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/product/${product.id}?restaurantId=${restaurantId}`)}
-                    activeOpacity={0.9}
-                    className="bg-primary py-2 mt-2 rounded-lg"
-                  >
-                    <Text className="text-on-primary text-xs font-bold text-center">{t('favorites.viewDish')}</Text>
-                  </TouchableOpacity>
+                  {!!restaurantNames[restaurantId] && (
+                    <Text className="text-xs text-on-surface-variant mt-0.5" numberOfLines={1}>
+                      {restaurantNames[restaurantId]}
+                    </Text>
+                  )}
+                  <View className="flex-row items-center justify-between mt-2">
+                    <Text className="text-lg font-bold text-primary">${product.price.toFixed(2)}</Text>
+                    <View className="w-9 h-9 rounded-full bg-primary items-center justify-center">
+                      <Icon name="arrow-forward" color="#ffffff" size={18} />
+                    </View>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}

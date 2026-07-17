@@ -45,7 +45,8 @@ export const couponsService = {
 
     if (!coupon.isActive)
       return { valid: false, discount: 0, reason: 'inactive', coupon };
-    if (coupon.expiresAt.toMillis() <= Date.now())
+    // expiresAt puede ser null (cupón sin fecha de expiración = nunca vence).
+    if (coupon.expiresAt && coupon.expiresAt.toMillis() <= Date.now())
       return { valid: false, discount: 0, reason: 'expired', coupon };
     if (coupon.usedCount >= coupon.maxUses)
       return { valid: false, discount: 0, reason: 'max_uses', coupon };

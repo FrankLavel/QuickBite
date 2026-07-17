@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import { useAuthListener } from '@/hooks/useAuth';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -36,6 +37,7 @@ export default function RootLayout() {
   }, [scheme, setColorScheme]);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <View style={themeVars[fullScheme]} className="flex-1 bg-background">
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
@@ -57,5 +59,6 @@ export default function RootLayout() {
         <ForegroundNotificationBanner />
       </View>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
