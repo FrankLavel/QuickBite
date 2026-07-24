@@ -12,7 +12,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -26,6 +25,8 @@ import { ORDER_STATUS, ORDER_STATUS_LABELS } from '../../utils/constants';
 import type { Order, OrderStatus } from '../../types/order';
 import { colors, radius, shadows, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
+import { formatCurrency } from '../../utils/format';
+import { notifyError } from '../../utils/notify';
 
 type Filter = 'activos' | 'programados' | 'listos';
 
@@ -164,7 +165,7 @@ export function OrdersScreen() {
     try {
       await setStatus(order.id, next, order.estimatedTime ?? 25);
     } catch {
-      Alert.alert('Error', 'No se pudo actualizar el pedido');
+      notifyError('No se pudo actualizar el pedido');
     }
   };
 
@@ -178,7 +179,7 @@ export function OrdersScreen() {
     try {
       await setStatus(order.id, ORDER_STATUS.REJECTED);
     } catch {
-      Alert.alert('Error', 'No se pudo rechazar el pedido');
+      notifyError('No se pudo rechazar el pedido');
     }
   };
 
@@ -273,8 +274,8 @@ export function OrdersScreen() {
                           #{o.id.slice(0, 6).toUpperCase()}
                         </Text>
                         <Text style={styles.prepMeta} numberOfLines={1}>
-                          {o.items.reduce((s, i) => s + i.qty, 0)} artículos ·
-                          ${o.total.toFixed(2)}
+                          {o.items.reduce((s, i) => s + i.qty, 0)} artículos ·{' '}
+                          {formatCurrency(o.total)}
                         </Text>
                       </View>
                     </View>
@@ -345,7 +346,7 @@ function OrderCard({
       <View style={styles.orderTop}>
         <StatusBadge status={order.status} />
         <View style={styles.orderTopRight}>
-          <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
+          <Text style={styles.orderTotal}>{formatCurrency(order.total)}</Text>
           <View style={[styles.payBadge, { backgroundColor: pay.bg }]}>
             <Text style={[styles.payText, { color: pay.fg }]}>{pay.text}</Text>
           </View>

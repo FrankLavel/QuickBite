@@ -26,6 +26,13 @@ import { useProducts } from '../../hooks/useProducts';
 import { ORDER_STATUS } from '../../utils/constants';
 import type { Order } from '../../types/order';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import {
+  computeDelta,
+  formatCurrency,
+  formatCurrencyCompact,
+  formatNumber,
+  formatPercent,
+} from '../../utils/format';
 
 function toDateSafe(v: unknown): Date | null {
   if (!v) return null;
@@ -114,6 +121,23 @@ export function HomeScreen() {
     const cancelRate =
       orders.length > 0 ? (cancelled / orders.length) * 100 : 0;
 
+    // Tendencias semana-a-semana: esta semana (días 0-6) vs. anterior (7-13).
+    const now = new Date();
+    const inWeek = (o: Order, from: number, to: number): boolean => {
+      const od = toDateSafe(o.createdAt);
+      if (!od) return false;
+      const ago = daysAgo(od, now);
+      return ago >= from && ago <= to;
+    };
+    const ordersThisWeek = orders.filter((o) => inWeek(o, 0, 6)).length;
+    const ordersLastWeek = orders.filter((o) => inWeek(o, 7, 13)).length;
+    const revThisWeek = delivered
+      .filter((o) => inWeek(o, 0, 6))
+      .reduce((s, o) => s + o.total, 0);
+    const revLastWeek = delivered
+      .filter((o) => inWeek(o, 7, 13))
+      .reduce((s, o) => s + o.total, 0);
+
     const series = buildSeries(orders, period);
     const peak = series.reduce(
       (best, p) => (p.value > best.value ? p : best),
@@ -129,6 +153,8 @@ export function HomeScreen() {
       cancelRate,
       series,
       peakLabel: peak.value > 0 ? peak.label : '—',
+      ordersTrend: computeDelta(ordersThisWeek, ordersLastWeek),
+      revenueTrend: computeDelta(revThisWeek, revLastWeek),
     };
   }, [orders, period]);
 
@@ -162,24 +188,26 @@ export function HomeScreen() {
           </View>
           <View style={styles.rangePill}>
             <Feather name="calendar" size={14} color={colors.textSecondary} />
-            <Text style={styles.rangePillText}>Últimos 7 días</Text>
+            <Text style={styles.rangePillText}>
+              {period === 'week' ? 'Últimos 7 días' : 'Últimos 28 días'}
+            </Text>
           </View>
         </View>
 
         <View style={styles.grid}>
           <MetricCard
             label="Pedidos totales"
-            value={String(orders.length)}
+            value={formatNumber(orders.length)}
             icon="shopping-bag"
             tone="primary"
-            hint={`${stats.pending} pendientes`}
+            trend={{ ...stats.ordersTrend, label: 'vs. semana pasada' }}
           />
           <MetricCard
             label="Ingresos"
-            value={`$${stats.revenue.toFixed(0)}`}
+            value={formatCurrencyCompact(stats.revenue)}
             icon="dollar-sign"
             tone="success"
-            hint="De pedidos entregados"
+            trend={{ ...stats.revenueTrend, label: 'vs. semana pasada' }}
           />
           <MetricCard
             label="Entregas activas"
@@ -239,12 +267,12 @@ export function HomeScreen() {
               <View style={styles.statTiles}>
                 <StatTile
                   label="Ticket promedio"
-                  value={`$${stats.avgOrder.toFixed(2)}`}
+                  value={formatCurrency(stats.avgOrder)}
                 />
                 <StatTile label="Día pico" value={stats.peakLabel} />
                 <StatTile
                   label="Cancelaciones"
-                  value={`${stats.cancelRate.toFixed(1)}%`}
+                  value={formatPercent(stats.cancelRate)}
                 />
                 <StatTile
                   label="En cocina"
@@ -278,8 +306,8 @@ export function HomeScreen() {
                           {a.title} #{order.id.slice(0, 6).toUpperCase()}
                         </Text>
                         <Text style={styles.activityMeta}>
-                          {order.items.length} artículos · $
-                          {order.total.toFixed(2)}
+                          {order.items.length} artículos ·{' '}
+                          {formatCurrency(order.total)}
                         </Text>
                       </View>
                     </View>
@@ -320,7 +348,7 @@ export function HomeScreen() {
                   {order.items.length}
                 </Text>
                 <Text style={[styles.td, styles.colTotal, styles.tdStrong]}>
-                  ${order.total.toFixed(2)}
+                  {formatCurrency(order.total)}
                 </Text>
                 <View style={styles.colStatus}>
                   <StatusBadge status={order.status} />

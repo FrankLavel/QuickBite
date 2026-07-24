@@ -14,6 +14,13 @@ import {
 } from 'react-native';
 import { colors, radius, spacing, typography } from '../utils/theme';
 
+/**
+ * react-native-web dibuja un outline de foco por defecto en los TextInput.
+ * Lo desactivamos porque ya tenemos indicador de foco propio (borde verde).
+ * El tipo de RN no incluye `outlineStyle`, pero RN Web sí lo respeta.
+ */
+export const noOutline = { outlineStyle: 'none' } as object;
+
 interface InputFieldProps extends TextInputProps {
   label: string;
   rightLabel?: string;
@@ -30,9 +37,12 @@ export function InputField({
   error,
   secureTextEntry,
   style,
+  onFocus,
+  onBlur,
   ...rest
 }: InputFieldProps) {
   const [hidden, setHidden] = useState(secureTextEntry);
+  const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.wrapper}>
@@ -45,12 +55,26 @@ export function InputField({
         ) : null}
       </View>
 
-      <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+      <View
+        style={[
+          styles.inputContainer,
+          focused ? styles.inputFocused : null,
+          error ? styles.inputError : null,
+        ]}
+      >
         {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
         <TextInput
-          style={[styles.input, style]}
+          style={[styles.input, noOutline, style]}
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secureTextEntry ? hidden : false}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
           {...rest}
         />
         {secureTextEntry ? (
@@ -86,12 +110,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.inputBackground,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     minHeight: 50,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: colors.border,
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
   },
   inputError: { borderColor: colors.danger },
   input: {

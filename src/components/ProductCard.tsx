@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import type { Product } from '../types/product';
 import { ProductImage } from './ProductImage';
 import { colors, radius, shadows, spacing, typography } from '../utils/theme';
+import { formatCurrency } from '../utils/format';
 
 interface ProductCardProps {
   product: Product;
@@ -89,7 +90,7 @@ export function ProductCard({
           <Text style={styles.name} numberOfLines={1}>
             {product.name}
           </Text>
-          <Text style={styles.price}>${product.price.toFixed(2)}</Text>
+          <Text style={styles.price}>{formatCurrency(product.price)}</Text>
         </View>
 
         <Text style={styles.description} numberOfLines={2}>

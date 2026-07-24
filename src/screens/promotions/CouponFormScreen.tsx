@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Switch,
 } from 'react-native';
 import type { RootScreenProps } from '../../types/navigation';
@@ -21,6 +20,7 @@ import { ModalFormShell } from '../../components/layout/ModalFormShell';
 import type { CouponFormData, CouponType } from '../../types/coupon';
 import { normalizeCouponCode } from '../../services/couponService';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import { notifyError } from '../../utils/notify';
 
 const emptyForm: CouponFormData = {
   code: '',
@@ -89,8 +89,7 @@ export function CouponFormScreen({
       }
       navigation.goBack();
     } catch (err) {
-      Alert.alert(
-        'Error',
+      notifyError(
         err instanceof Error ? err.message : 'No se pudo guardar el cupón'
       );
     } finally {

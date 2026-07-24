@@ -14,6 +14,15 @@ type FeatherIconName = ComponentProps<typeof Feather>['name'];
 type Tone = 'primary' | 'info' | 'success' | 'warning' | 'danger';
 type BadgeTone = 'up' | 'live' | 'priority' | 'neutral';
 
+/** Tendencia comparativa (ej. semana vs. semana anterior). */
+export interface MetricTrend {
+  /** Magnitud del cambio, en porcentaje (siempre positiva). */
+  percent: number;
+  direction: 'up' | 'down' | 'flat';
+  /** Texto de referencia (ej. "vs. semana pasada"). */
+  label?: string;
+}
+
 interface MetricCardProps {
   label: string;
   value: string;
@@ -23,6 +32,21 @@ interface MetricCardProps {
   /** Texto de la insignia superior derecha (ej. "En vivo", "+12%"). */
   badge?: string;
   badgeTone?: BadgeTone;
+  /** Tendencia con flecha ▲/▼ y color (reemplaza a `hint` si se provee). */
+  trend?: MetricTrend;
+  /**
+   * Dónde se pinta la tendencia:
+   * - 'bottom' (default): píldora bajo el valor, con etiqueta de referencia.
+   * - 'top': texto compacto en la esquina superior derecha (estilo analíticas).
+   */
+  trendPosition?: 'top' | 'bottom';
+  /**
+   * Estilo de la tarjeta:
+   * - 'default': chip de icono arriba + valor grande (dashboard general).
+   * - 'compact': etiqueta en mayúsculas, valor grande e indicador inline
+   *   (estilo catálogo del mockup de Menú).
+   */
+  variant?: 'default' | 'compact';
   /** Compatibilidad: acento verde (equivale a tone="primary"). */
   accent?: boolean;
   /** Compatibilidad: resalta en rojo (equivale a tone="danger"). */
@@ -44,6 +68,12 @@ const BADGE_COLORS: Record<BadgeTone, { bg: string; fg: string }> = {
   neutral: { bg: colors.surfaceMuted, fg: colors.textSecondary },
 };
 
+const TREND_COLORS: Record<MetricTrend['direction'], { fg: string; icon: FeatherIconName }> = {
+  up: { fg: colors.success, icon: 'trending-up' },
+  down: { fg: colors.danger, icon: 'trending-down' },
+  flat: { fg: colors.textSecondary, icon: 'minus' },
+};
+
 export function MetricCard({
   label,
   value,
@@ -52,13 +82,40 @@ export function MetricCard({
   tone,
   badge,
   badgeTone = 'neutral',
+  trend,
+  trendPosition = 'bottom',
+  variant = 'default',
   accent,
   danger,
 }: MetricCardProps) {
   const effectiveTone: Tone = danger ? 'danger' : accent ? 'primary' : tone ?? 'primary';
   const toneC = TONE_COLORS[effectiveTone];
   const badgeC = BADGE_COLORS[badgeTone];
-  const showTopRow = Boolean(icon || badge);
+  const trendC = trend ? TREND_COLORS[trend.direction] : null;
+  const trendOnTop = Boolean(trend && trendC && trendPosition === 'top');
+  const showTopRow = Boolean(icon || badge || trendOnTop);
+
+  if (variant === 'compact') {
+    return (
+      <View style={[styles.card, styles.compactCard, danger && styles.dangerCard]}>
+        <Text style={styles.compactLabel}>{label.toUpperCase()}</Text>
+        <View style={styles.compactValueRow}>
+          <Text style={styles.compactValue} numberOfLines={1}>
+            {value}
+          </Text>
+          <View style={styles.compactTrailing}>
+            {hint ? (
+              <Text style={[styles.compactHint, { color: toneC.fg }]} numberOfLines={1}>
+                {hint}
+              </Text>
+            ) : icon ? (
+              <Feather name={icon} size={16} color={toneC.fg} />
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.card, danger && styles.dangerCard]}>
@@ -77,13 +134,36 @@ export function MetricCard({
                 {badge}
               </Text>
             </View>
+          ) : trendOnTop && trend && trendC ? (
+            <View style={styles.trendTop}>
+              <Text style={[styles.trendTopText, { color: trendC.fg }]}>
+                {trend.direction === 'up' ? '+' : trend.direction === 'down' ? '−' : ''}
+                {trend.percent.toFixed(1)}%
+              </Text>
+              <Feather name={trendC.icon} size={13} color={trendC.fg} />
+            </View>
           ) : null}
         </View>
       ) : null}
 
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
-      {hint ? (
+      {trend && trendC && !trendOnTop ? (
+        <View style={styles.trendRow}>
+          <View style={styles.trendPill}>
+            <Feather name={trendC.icon} size={12} color={trendC.fg} />
+            <Text style={[styles.trendText, { color: trendC.fg }]}>
+              {trend.direction === 'up' ? '+' : trend.direction === 'down' ? '−' : ''}
+              {trend.percent.toFixed(1)}%
+            </Text>
+          </View>
+          {trend.label ? (
+            <Text style={styles.trendLabel} numberOfLines={1}>
+              {trend.label}
+            </Text>
+          ) : null}
+        </View>
+      ) : hint ? (
         <Text style={[styles.hint, { color: toneC.fg }]}>{hint}</Text>
       ) : null}
     </View>
@@ -138,5 +218,72 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginTop: spacing.xs,
     fontWeight: '600',
+  },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  trendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  trendText: {
+    ...typography.caption,
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  trendLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  trendTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  trendTopText: {
+    ...typography.caption,
+    fontWeight: '800',
+  },
+  compactCard: {
+    justifyContent: 'center',
+    minWidth: 160,
+  },
+  compactLabel: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  compactValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  compactValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    flexShrink: 1,
+  },
+  compactTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactHint: {
+    ...typography.caption,
+    fontWeight: '700',
+    textAlign: 'right',
   },
 });

@@ -11,12 +11,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { InputField } from './InputField';
 import { colors, radius, spacing, typography } from '../utils/theme';
+import { notifyError } from '../utils/notify';
 
 export interface CoverPickerValue {
   previewUri: string | null;
@@ -37,9 +37,9 @@ export function CoverPicker({ value, onChange }: CoverPickerProps) {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a la galería para la portada.'
+      notifyError(
+        'Necesitamos acceso a la galería para la portada.',
+        'Permiso requerido'
       );
       return;
     }

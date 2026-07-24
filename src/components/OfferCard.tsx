@@ -1,6 +1,7 @@
 /**
  * components/OfferCard.tsx
- * Tarjeta de banner promocional (offer).
+ * Tarjeta de banner promocional (offer) — vista previa del banner en la app,
+ * con estado de visibilidad, cupón vinculado y acciones.
  */
 
 import React from 'react';
@@ -30,40 +31,73 @@ export function OfferCard({
   onToggle,
   onDelete,
 }: OfferCardProps) {
+  const hidden = !offer.isActive;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, hidden && styles.cardHidden]}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
         <View style={styles.imageWrap}>
-          <ProductImage uri={offer.image} style={styles.image} />
+          <ProductImage uri={offer.image} style={styles.image} dimmed={hidden} />
+
           {offer.badge ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{offer.badge.toUpperCase()}</Text>
             </View>
           ) : null}
-        </View>
-        <Text style={styles.title}>{offer.title}</Text>
-        <Text style={styles.description} numberOfLines={2}>
-          {offer.description}
-        </Text>
-        {offer.couponCode ? (
-          <View style={styles.couponLink}>
-            <Feather name="link" size={12} color={colors.primary} />
-            <Text style={styles.couponText}>Cupón: {offer.couponCode}</Text>
+
+          <View style={styles.editBtn}>
+            <Feather name="edit-2" size={14} color={colors.text} />
           </View>
-        ) : null}
+
+          {hidden ? (
+            <View style={styles.hiddenOverlay}>
+              <View style={styles.hiddenBadge}>
+                <Feather name="eye-off" size={13} color={colors.textOnPrimary} />
+                <Text style={styles.hiddenText}>OCULTO</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.content}>
+          <Text style={styles.title} numberOfLines={1}>
+            {offer.title}
+          </Text>
+          <Text style={styles.description} numberOfLines={2}>
+            {offer.description || 'Sin descripción.'}
+          </Text>
+          {offer.couponCode ? (
+            <View style={styles.couponChip}>
+              <Feather name="tag" size={11} color={colors.primary} />
+              <Text style={styles.couponText}>{offer.couponCode}</Text>
+            </View>
+          ) : null}
+        </View>
       </TouchableOpacity>
 
       <View style={styles.footer}>
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Visible en app</Text>
           <Switch
             value={offer.isActive}
             onValueChange={onToggle}
             trackColor={{ false: colors.border, true: colors.primaryLight }}
             thumbColor={offer.isActive ? colors.primary : colors.textMuted}
           />
+          <Text
+            style={[
+              styles.switchLabel,
+              { color: offer.isActive ? colors.primary : colors.textMuted },
+            ]}
+          >
+            {offer.isActive ? 'Visible en app' : 'Oculto'}
+          </Text>
         </View>
-        <Pressable onPress={onDelete} hitSlop={8}>
+        <Pressable
+          onPress={onDelete}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+          accessibilityLabel="Eliminar banner"
+        >
           <Feather name="trash-2" size={16} color={colors.danger} />
         </Pressable>
       </View>
@@ -76,12 +110,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
   },
-  imageWrap: { position: 'relative', height: 140 },
+  cardHidden: { opacity: 0.85 },
+  imageWrap: {
+    position: 'relative',
+    height: 105,
+    backgroundColor: colors.surfaceMuted,
+  },
   image: { width: '100%', height: '100%' },
   badge: {
     position: 'absolute',
@@ -91,36 +129,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.full,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   badgeText: {
     fontSize: 10,
     color: colors.textOnPrimary,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  title: {
-    ...typography.h3,
-    color: colors.text,
+  editBtn: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
+  hiddenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hiddenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.textSecondary,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
   },
+  hiddenText: {
+    color: colors.textOnPrimary,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  content: { padding: spacing.md },
+  title: { ...typography.h3, color: colors.text, fontWeight: '700' },
   description: {
     ...typography.bodySmall,
     color: colors.textSecondary,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
+    marginTop: spacing.xs,
+    lineHeight: 18,
+    minHeight: 36,
   },
-  couponLink: {
+  couponChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
   },
   couponText: {
     ...typography.caption,
-    color: colors.primary,
-    fontWeight: '600',
+    color: colors.primaryDark,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   footer: {
     flexDirection: 'row',
@@ -130,8 +206,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
   },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  switchLabel: { ...typography.caption, color: colors.text },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  switchLabel: { ...typography.caption, fontWeight: '700' },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnPressed: { backgroundColor: colors.surfaceMuted },
 });

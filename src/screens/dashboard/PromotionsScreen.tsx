@@ -8,11 +8,9 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
-  Alert,
   RefreshControl,
-  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
@@ -20,17 +18,19 @@ import { Feather } from '@expo/vector-icons';
 import { ScreenShell } from '../../components/layout/ScreenShell';
 import { CouponCard } from '../../components/CouponCard';
 import { OfferCard } from '../../components/OfferCard';
+import { MetricCard } from '../../components/MetricCard';
 import { Button } from '../../components/Button';
 import { usePromotions } from '../../hooks/usePromotions';
 import type { RootStackParamList } from '../../types/navigation';
 import { colors, radius, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
+import { formatNumber } from '../../utils/format';
+import { notifyError } from '../../utils/notify';
 
 type Tab = 'coupons' | 'offers';
 
 export function PromotionsScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { width } = useWindowDimensions();
   const {
     coupons,
     offers,
@@ -43,13 +43,6 @@ export function PromotionsScreen() {
   } = usePromotions();
 
   const [tab, setTab] = useState<Tab>('coupons');
-
-  const numColumns = width >= 900 ? 2 : 1;
-  const gap = spacing.md;
-  const cardWidth =
-    numColumns === 1
-      ? width - spacing.md * 2
-      : (width - spacing.md * 2 - gap) / 2;
 
   const activeCoupons = useMemo(
     () => coupons.filter((c) => c.isActive).length,
@@ -66,9 +59,8 @@ export function PromotionsScreen() {
     try {
       await removeCoupon(code);
     } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'No se pudo eliminar'
+      notifyError(
+        err instanceof Error ? err.message : 'No se pudo eliminar el cupón'
       );
     }
   };
@@ -83,93 +75,97 @@ export function PromotionsScreen() {
     try {
       await removeOffer(id);
     } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'No se pudo eliminar'
+      notifyError(
+        err instanceof Error ? err.message : 'No se pudo eliminar el banner'
       );
     }
   };
 
   return (
     <ScreenShell searchPlaceholder="Buscar cupones o banners...">
-      <View style={styles.header}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.pageTitle}>Promociones</Text>
-          <Text style={styles.subtitle}>
-            Asigna cupones y banners con límites de uso, vigencia y pedido mínimo.
-            Los clientes los verán en la app móvil.
-          </Text>
-        </View>
-        <Button
-          title={tab === 'coupons' ? 'Nuevo cupón' : 'Nuevo banner'}
-          onPress={() =>
-            tab === 'coupons'
-              ? navigation.navigate('CouponForm', {})
-              : navigation.navigate('OfferForm', {})
-          }
-        />
-      </View>
-
-      <View style={styles.metrics}>
-        <View style={styles.metricChip}>
-          <Text style={styles.metricValue}>{coupons.length}</Text>
-          <Text style={styles.metricLabel}>Cupones</Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text style={styles.metricValue}>{activeCoupons}</Text>
-          <Text style={styles.metricLabel}>Cupones activos</Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text style={styles.metricValue}>{offers.length}</Text>
-          <Text style={styles.metricLabel}>Banners</Text>
-        </View>
-      </View>
-
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'coupons' && styles.tabActive]}
-          onPress={() => setTab('coupons')}
-        >
-          <Feather
-            name="tag"
-            size={16}
-            color={tab === 'coupons' ? colors.primary : colors.textSecondary}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} />
+        }
+      >
+        <View style={styles.header}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.pageTitle}>Promociones</Text>
+            <Text style={styles.subtitle}>
+              Asigna cupones y banners con límites de uso, vigencia y pedido
+              mínimo. Los clientes los verán en la app móvil.
+            </Text>
+          </View>
+          <Button
+            title={tab === 'coupons' ? 'Nuevo cupón' : 'Nuevo banner'}
+            onPress={() =>
+              tab === 'coupons'
+                ? navigation.navigate('CouponForm', {})
+                : navigation.navigate('OfferForm', {})
+            }
           />
-          <Text
-            style={[styles.tabText, tab === 'coupons' && styles.tabTextActive]}
-          >
-            Cupones / Tickets
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'offers' && styles.tabActive]}
-          onPress={() => setTab('offers')}
-        >
-          <Feather
-            name="image"
-            size={16}
-            color={tab === 'offers' ? colors.primary : colors.textSecondary}
-          />
-          <Text
-            style={[styles.tabText, tab === 'offers' && styles.tabTextActive]}
-          >
-            Banners
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {tab === 'coupons' ? (
-        <FlatList
-          key={`coupons-${numColumns}`}
-          data={coupons}
-          keyExtractor={(item) => item.code}
-          numColumns={numColumns}
-          columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={refresh} />
-          }
-          ListEmptyComponent={
+        <View style={styles.metrics}>
+          <MetricCard
+            variant="compact"
+            label="Cupones"
+            value={formatNumber(coupons.length)}
+            icon="tag"
+            tone="primary"
+          />
+          <MetricCard
+            variant="compact"
+            label="Cupones activos"
+            value={formatNumber(activeCoupons)}
+            icon="check-circle"
+            tone="success"
+          />
+          <MetricCard
+            variant="compact"
+            label="Banners"
+            value={formatNumber(offers.length)}
+            icon="image"
+            tone="info"
+          />
+        </View>
+
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, tab === 'coupons' && styles.tabActive]}
+            onPress={() => setTab('coupons')}
+          >
+            <Feather
+              name="tag"
+              size={16}
+              color={tab === 'coupons' ? colors.primary : colors.textSecondary}
+            />
+            <Text
+              style={[styles.tabText, tab === 'coupons' && styles.tabTextActive]}
+            >
+              Cupones / Tickets
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, tab === 'offers' && styles.tabActive]}
+            onPress={() => setTab('offers')}
+          >
+            <Feather
+              name="image"
+              size={16}
+              color={tab === 'offers' ? colors.primary : colors.textSecondary}
+            />
+            <Text
+              style={[styles.tabText, tab === 'offers' && styles.tabTextActive]}
+            >
+              Banners
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {tab === 'coupons' ? (
+          coupons.length === 0 ? (
             <View style={styles.empty}>
               <Feather name="tag" size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>Sin cupones</Text>
@@ -178,71 +174,68 @@ export function PromotionsScreen() {
                 y fecha de vencimiento.
               </Text>
             </View>
-          }
-          renderItem={({ item }) => (
-            <View style={{ width: cardWidth }}>
-              <CouponCard
-                coupon={item}
-                onPress={() =>
-                  navigation.navigate('CouponForm', { code: item.code })
-                }
-                onToggle={(v) => toggleCoupon(item.code, v)}
-                onDelete={() => handleDeleteCoupon(item.code)}
-              />
+          ) : (
+            <View style={styles.grid}>
+              {coupons.map((item) => (
+                <View key={item.code} style={styles.couponWrap}>
+                  <CouponCard
+                    coupon={item}
+                    onPress={() =>
+                      navigation.navigate('CouponForm', { code: item.code })
+                    }
+                    onToggle={(v) => toggleCoupon(item.code, v)}
+                    onDelete={() => handleDeleteCoupon(item.code)}
+                  />
+                </View>
+              ))}
             </View>
-          )}
-        />
-      ) : (
-        <FlatList
-          key={`offers-${numColumns}`}
-          data={offers}
-          keyExtractor={(item) => item.id}
-          numColumns={numColumns}
-          columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={refresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Feather name="image" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>Sin banners</Text>
-              <Text style={styles.emptyText}>
-                Publica banners en el Home de la app. Puedes vincular un cupón
-                opcional.
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={{ width: cardWidth }}>
-              <OfferCard
-                offer={item}
-                onPress={() =>
-                  navigation.navigate('OfferForm', { offerId: item.id })
-                }
-                onToggle={(v) => toggleOffer(item.id, v)}
-                onDelete={() => handleDeleteOffer(item.id, item.title)}
-              />
-            </View>
-          )}
-        />
-      )}
+          )
+        ) : offers.length === 0 ? (
+          <View style={styles.empty}>
+            <Feather name="image" size={40} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>Sin banners</Text>
+            <Text style={styles.emptyText}>
+              Publica banners en el Home de la app. Puedes vincular un cupón
+              opcional.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {offers.map((item) => (
+              <View key={item.id} style={styles.offerWrap}>
+                <OfferCard
+                  offer={item}
+                  onPress={() =>
+                    navigation.navigate('OfferForm', { offerId: item.id })
+                  }
+                  onToggle={(v) => toggleOffer(item.id, v)}
+                  onDelete={() => handleDeleteOffer(item.id, item.title)}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: spacing.md,
-    marginBottom: spacing.md,
     flexWrap: 'wrap',
   },
   titleBlock: { flex: 1, minWidth: 200 },
   pageTitle: {
-    ...typography.h2,
+    ...typography.h1,
     color: colors.text,
     marginBottom: spacing.xs,
   },
@@ -253,31 +246,13 @@ const styles = StyleSheet.create({
   },
   metrics: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: spacing.md,
     flexWrap: 'wrap',
-  },
-  metricChip: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  metricValue: {
-    ...typography.h3,
-    color: colors.primary,
-    fontWeight: '800',
-  },
-  metricLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
   },
   tabs: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    flexWrap: 'wrap',
   },
   tab: {
     flexDirection: 'row',
@@ -300,8 +275,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tabTextActive: { color: colors.primary },
-  list: { paddingBottom: spacing.xl },
-  row: { gap: spacing.md, marginBottom: 0 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  couponWrap: {
+    flexGrow: 1,
+    flexBasis: 260,
+    minWidth: 240,
+    maxWidth: 280,
+  },
+  offerWrap: {
+    flexGrow: 1,
+    flexBasis: 238,
+    minWidth: 200,
+    maxWidth: 322,
+  },
   empty: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,

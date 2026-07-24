@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +21,7 @@ import { ProductImage } from '../../components/ProductImage';
 import { ModalFormShell } from '../../components/layout/ModalFormShell';
 import type { OfferFormData } from '../../types/offer';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import { notifyError } from '../../utils/notify';
 
 const emptyForm: OfferFormData = {
   badge: '',
@@ -65,9 +65,9 @@ export function OfferFormScreen({
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a la galería para la imagen del banner.'
+      notifyError(
+        'Necesitamos acceso a la galería para la imagen del banner.',
+        'Permiso requerido'
       );
       return;
     }
@@ -120,8 +120,7 @@ export function OfferFormScreen({
       }
       navigation.goBack();
     } catch (err) {
-      Alert.alert(
-        'Error',
+      notifyError(
         err instanceof Error ? err.message : 'No se pudo guardar el banner'
       );
     } finally {

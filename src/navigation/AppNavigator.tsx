@@ -17,6 +17,7 @@ import { LoadingOverlay } from '../components/LoadingOverlay';
 import { ProductProvider } from '../context/ProductContext';
 import { OrderProvider } from '../context/OrderContext';
 import { PromotionProvider } from '../context/PromotionContext';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -62,7 +63,7 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {user ? <AuthenticatedApp /> : <AuthNavigator />}
     </NavigationContainer>
   );

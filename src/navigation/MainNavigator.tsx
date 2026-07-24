@@ -15,6 +15,7 @@ import { AnalyticsScreen } from '../screens/dashboard/AnalyticsScreen';
 import { CustomersScreen } from '../screens/dashboard/CustomersScreen';
 import { NotificationsScreen } from '../screens/dashboard/NotificationsScreen';
 import { SettingsScreen } from '../screens/dashboard/SettingsScreen';
+import { PreferencesScreen } from '../screens/dashboard/PreferencesScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -33,6 +34,7 @@ export function MainNavigator() {
       <Stack.Screen name="Clientes" component={CustomersScreen} />
       <Stack.Screen name="Notificaciones" component={NotificationsScreen} />
       <Stack.Screen name="Configuracion" component={SettingsScreen} />
+      <Stack.Screen name="Preferencias" component={PreferencesScreen} />
     </Stack.Navigator>
   );
 }

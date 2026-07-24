@@ -1,6 +1,8 @@
 /**
  * screens/dashboard/SettingsScreen.tsx
- * Perfil del restaurante + avatar/logo editable.
+ * Configuración del restaurante: identidad de marca, responsable, horarios,
+ * estado del local y operaciones de entrega. Layout de dos columnas coherente
+ * con el resto del dashboard y feedback inline (compatible con web).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -9,10 +11,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Switch,
+  TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { ScreenShell } from '../../components/layout/ScreenShell';
+import { SectionCard } from '../../components/SectionCard';
 import { InputField } from '../../components/InputField';
 import { Button } from '../../components/Button';
 import { AvatarPicker, type AvatarPickerValue } from '../../components/AvatarPicker';
@@ -25,9 +30,14 @@ import { useAuth } from '../../hooks/useAuth';
 import { colors, radius, shadows, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
 import { getProfileAvatarUri } from '../../components/UserAvatar';
+import { geocodeAddress } from '../../services/geocode';
+
+type Feedback = { type: 'success' | 'error'; text: string } | null;
 
 export function SettingsScreen() {
   const { user, restaurant, updateProfile, logout } = useAuth();
+  const { width } = useWindowDimensions();
+  const wide = width >= 1024;
 
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
@@ -58,6 +68,8 @@ export function SettingsScreen() {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [saving, setSaving] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
     const uri = getProfileAvatarUri(restaurant?.logoImage, user?.photoURL);
@@ -94,8 +106,13 @@ export function SettingsScreen() {
   }, [user, restaurant]);
 
   const handleSave = async () => {
+    setFeedback(null);
+
     if (!restaurantName.trim()) {
-      Alert.alert('Validación', 'El nombre del restaurante es obligatorio');
+      setFeedback({
+        type: 'error',
+        text: 'El nombre del restaurante es obligatorio.',
+      });
       return;
     }
 
@@ -113,10 +130,10 @@ export function SettingsScreen() {
         lng < -180 ||
         lng > 180
       ) {
-        Alert.alert(
-          'Ubicación inválida',
-          'Latitud (-90 a 90) y longitud (-180 a 180) deben ser números válidos, o deja ambos campos vacíos.'
-        );
+        setFeedback({
+          type: 'error',
+          text: 'Ubicación inválida: latitud (-90 a 90) y longitud (-180 a 180) deben ser números válidos, o deja ambos campos vacíos.',
+        });
         return;
       }
       location = new GeoPoint(lat, lng);
@@ -134,7 +151,6 @@ export function SettingsScreen() {
       cuisineTypes,
       schedule,
     };
-    // Solo escribimos location si el usuario capturó coordenadas válidas.
     if (location) {
       restaurantUpdates.location = location;
     }
@@ -151,191 +167,412 @@ export function SettingsScreen() {
           coverImageURL: cover.imageURL,
         }
       );
-      Alert.alert('Listo', 'Perfil del restaurante guardado correctamente');
+      setFeedback({
+        type: 'success',
+        text: 'Perfil del restaurante guardado correctamente.',
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo guardar el perfil';
-      Alert.alert('Error', message);
+      setFeedback({ type: 'error', text: message });
     } finally {
       setSaving(false);
     }
   };
 
+  const handleGeocode = async () => {
+    setFeedback(null);
+    if (!address.trim()) {
+      setFeedback({
+        type: 'error',
+        text: 'Escribe primero la dirección para obtener sus coordenadas.',
+      });
+      return;
+    }
+    setGeocoding(true);
+    try {
+      const result = await geocodeAddress(address);
+      if (!result) {
+        setFeedback({
+          type: 'error',
+          text: 'No se encontró la dirección. Revisa que esté completa (calle, número, ciudad y estado).',
+        });
+        return;
+      }
+      setLatitude(result.lat.toFixed(6));
+      setLongitude(result.lng.toFixed(6));
+      setFeedback({
+        type: 'success',
+        text: 'Coordenadas obtenidas de la dirección. Revisa que el punto sea correcto y guarda los cambios.',
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron obtener las coordenadas.';
+      setFeedback({ type: 'error', text: message });
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    const confirmed = await confirmAction(
+      'Cerrar sesión',
+      '¿Salir de QuickBite?',
+      { confirmText: 'Salir', cancelText: 'Cancelar', destructive: true }
+    );
+    if (confirmed) await logout();
+  };
+
   return (
     <ScreenShell searchPlaceholder="Buscar en configuración...">
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Perfil del restaurante</Text>
-        <Text style={styles.subtitle}>
-          Avatar, identidad de marca y operaciones del local
-        </Text>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Avatar y marca</Text>
-          <AvatarPicker
-            name={restaurantName || name}
-            value={avatar}
-            onChange={setAvatar}
-          />
-          <CoverPicker value={cover} onChange={setCover} />
-          <InputField
-            label="Nombre del responsable"
-            value={name}
-            onChangeText={setName}
-          />
-          <InputField
-            label="Teléfono"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-          <InputField
-            label="Nombre del restaurante"
-            value={restaurantName}
-            onChangeText={setRestaurantName}
-          />
-          <InputField
-            label="Descripción / eslogan"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            style={styles.multiline}
-          />
-          <InputField
-            label="Dirección"
-            value={address}
-            onChangeText={setAddress}
-          />
-          <CuisineSelector value={cuisineTypes} onChange={setCuisineTypes} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Horarios de atención</Text>
-          <ScheduleEditor value={schedule} onChange={setSchedule} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Operaciones del local</Text>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>
-              {isOpen
-                ? 'Aceptando pedidos (Abierto)'
-                : 'No acepta pedidos (Cerrado)'}
+        <View style={styles.pageHead}>
+          <View style={styles.pageHeadText}>
+            <Text style={styles.title}>Configuración</Text>
+            <Text style={styles.subtitle}>
+              Identidad de marca, horarios y operaciones del local
             </Text>
-            <Switch
-              value={isOpen}
-              onValueChange={setIsOpen}
-              trackColor={{ false: colors.border, true: colors.primarySoft }}
-              thumbColor={isOpen ? colors.primary : colors.textMuted}
-            />
           </View>
-          <InputField
-            label="Tiempo de entrega"
-            value={deliveryTime}
-            onChangeText={setDeliveryTime}
-            placeholder="25-35 min"
+          <Button
+            title="Guardar cambios"
+            onPress={handleSave}
+            loading={saving}
+            style={styles.headSave}
           />
-          <InputField
-            label="Tarifa de envío ($)"
-            value={deliveryFee}
-            onChangeText={setDeliveryFee}
-            keyboardType="decimal-pad"
-          />
-          <InputField
-            label="Pedido mínimo ($)"
-            value={minOrder}
-            onChangeText={setMinOrder}
-            keyboardType="decimal-pad"
-          />
-          <InputField
-            label="Zona de entrega (km)"
-            value={deliveryZone}
-            onChangeText={setDeliveryZone}
-            keyboardType="decimal-pad"
-          />
+        </View>
 
-          <Text style={styles.sectionHint}>
-            Ubicación del local (opcional, para mapa y distancia en la app)
-          </Text>
-          <View style={styles.coordsRow}>
-            <View style={styles.coordField}>
+        {feedback ? (
+          <View
+            style={[
+              styles.banner,
+              feedback.type === 'success'
+                ? styles.bannerSuccess
+                : styles.bannerError,
+            ]}
+          >
+            <Feather
+              name={feedback.type === 'success' ? 'check-circle' : 'alert-circle'}
+              size={16}
+              color={feedback.type === 'success' ? colors.success : colors.danger}
+            />
+            <Text
+              style={[
+                styles.bannerText,
+                {
+                  color:
+                    feedback.type === 'success'
+                      ? colors.success
+                      : colors.danger,
+                },
+              ]}
+            >
+              {feedback.text}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.columns, wide && styles.columnsRow]}>
+          {/* Columna principal: marca, responsable y horarios */}
+          <View style={wide ? styles.colMain : undefined}>
+            <SectionCard
+              title="Identidad de marca"
+              subtitle="Cómo te ven los clientes en la app"
+            >
+              <AvatarPicker
+                name={restaurantName || name}
+                value={avatar}
+                onChange={setAvatar}
+              />
+              <CoverPicker value={cover} onChange={setCover} />
               <InputField
-                label="Latitud"
-                value={latitude}
-                onChangeText={setLatitude}
-                placeholder="19.4326"
-                keyboardType="numbers-and-punctuation"
+                label="Nombre del restaurante"
+                value={restaurantName}
+                onChangeText={setRestaurantName}
+              />
+              <InputField
+                label="Descripción / eslogan"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                style={styles.multiline}
+              />
+              <InputField
+                label="Dirección"
+                value={address}
+                onChangeText={setAddress}
+              />
+              <CuisineSelector value={cuisineTypes} onChange={setCuisineTypes} />
+            </SectionCard>
+
+            <SectionCard
+              title="Horarios de atención"
+              subtitle="Días y horas en que recibes pedidos"
+              style={styles.stack}
+            >
+              <ScheduleEditor value={schedule} onChange={setSchedule} />
+            </SectionCard>
+          </View>
+
+          {/* Columna lateral: estado y operaciones */}
+          <View style={wide ? styles.colSide : undefined}>
+            <View
+              style={[
+                styles.statusCard,
+                isOpen ? styles.statusOpen : styles.statusClosed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusIcon,
+                  {
+                    backgroundColor: isOpen
+                      ? colors.primary
+                      : colors.danger,
+                  },
+                ]}
+              >
+                <Feather
+                  name={isOpen ? 'unlock' : 'lock'}
+                  size={18}
+                  color={colors.textOnPrimary}
+                />
+              </View>
+              <View style={styles.statusText}>
+                <Text style={styles.statusTitle}>
+                  {isOpen ? 'Abierto' : 'Cerrado'}
+                </Text>
+                <Text style={styles.statusDesc}>
+                  {isOpen
+                    ? 'Aceptando pedidos en la app'
+                    : 'No se muestran pedidos nuevos'}
+                </Text>
+              </View>
+              <Switch
+                value={isOpen}
+                onValueChange={setIsOpen}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={isOpen ? colors.primary : colors.textMuted}
               />
             </View>
-            <View style={styles.coordField}>
+
+            <SectionCard
+              title="Datos del responsable"
+              subtitle="Contacto interno de la cuenta"
+              style={styles.stack}
+            >
               <InputField
-                label="Longitud"
-                value={longitude}
-                onChangeText={setLongitude}
-                placeholder="-99.1332"
-                keyboardType="numbers-and-punctuation"
+                label="Nombre del responsable"
+                value={name}
+                onChangeText={setName}
               />
-            </View>
+              <InputField
+                label="Teléfono"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </SectionCard>
+
+            <SectionCard
+              title="Operaciones de entrega"
+              subtitle="Tarifas y cobertura del servicio"
+              style={styles.stack}
+            >
+              <InputField
+                label="Tiempo de entrega"
+                value={deliveryTime}
+                onChangeText={setDeliveryTime}
+                placeholder="25-35 min"
+              />
+              <InputField
+                label="Tarifa de envío (MXN)"
+                value={deliveryFee}
+                onChangeText={setDeliveryFee}
+                keyboardType="decimal-pad"
+              />
+              <InputField
+                label="Pedido mínimo (MXN)"
+                value={minOrder}
+                onChangeText={setMinOrder}
+                keyboardType="decimal-pad"
+              />
+              <InputField
+                label="Zona de entrega (km)"
+                value={deliveryZone}
+                onChangeText={setDeliveryZone}
+                keyboardType="decimal-pad"
+              />
+            </SectionCard>
+
+            <SectionCard
+              title="Ubicación del local"
+              subtitle="Para el mapa y la distancia de reparto en la app"
+              style={styles.stack}
+            >
+              <TouchableOpacity
+                style={[styles.geoBtn, geocoding && styles.geoBtnDisabled]}
+                onPress={handleGeocode}
+                disabled={geocoding}
+                activeOpacity={0.85}
+              >
+                <Feather
+                  name={geocoding ? 'loader' : 'map-pin'}
+                  size={15}
+                  color={colors.primary}
+                />
+                <Text style={styles.geoBtnText}>
+                  {geocoding
+                    ? 'Buscando…'
+                    : 'Obtener coordenadas de la dirección'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.geoHint}>
+                Se calculan solas desde la dirección de arriba. También puedes
+                ajustarlas a mano.
+              </Text>
+              <View style={styles.coordsRow}>
+                <View style={styles.coordField}>
+                  <InputField
+                    label="Latitud"
+                    value={latitude}
+                    onChangeText={setLatitude}
+                    placeholder="19.4326"
+                    keyboardType="numbers-and-punctuation"
+                  />
+                </View>
+                <View style={styles.coordField}>
+                  <InputField
+                    label="Longitud"
+                    value={longitude}
+                    onChangeText={setLongitude}
+                    placeholder="-99.1332"
+                    keyboardType="numbers-and-punctuation"
+                  />
+                </View>
+              </View>
+            </SectionCard>
           </View>
         </View>
 
-        <Button title="Guardar perfil" onPress={handleSave} loading={saving} />
-        <Button
-          title="Cerrar sesión"
-          variant="outline"
-          onPress={async () => {
-            const confirmed = await confirmAction(
-              'Cerrar sesión',
-              '¿Salir de QuickBite?',
-              { confirmText: 'Salir', cancelText: 'Cancelar', destructive: true }
-            );
-            if (confirmed) await logout();
-          }}
-          style={styles.logout}
-        />
+        <View style={styles.footer}>
+          <Button
+            title="Guardar cambios"
+            onPress={handleSave}
+            loading={saving}
+            style={styles.footerSave}
+          />
+          <Button
+            title="Cerrar sesión"
+            variant="outline"
+            onPress={handleLogout}
+          />
+        </View>
       </ScrollView>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
+  scroll: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
+  pageHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  pageHeadText: { flex: 1, minWidth: 220 },
   title: { ...typography.h1, color: colors.text },
   subtitle: {
     ...typography.bodySmall,
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    ...shadows.card,
-  },
-  cardTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  multiline: { minHeight: 80, textAlignVertical: 'top' },
-  switchRow: {
+  headSave: { minWidth: 160 },
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  switchLabel: {
+  bannerSuccess: {
+    backgroundColor: colors.successSoft,
+    borderColor: colors.success,
+  },
+  bannerError: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger,
+  },
+  bannerText: { ...typography.bodySmall, fontWeight: '600', flex: 1 },
+  columns: { gap: spacing.md },
+  columnsRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  colMain: { flex: 2, gap: spacing.md },
+  colSide: { flex: 1, minWidth: 300, gap: spacing.md },
+  stack: {},
+  multiline: { minHeight: 80, textAlignVertical: 'top' },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.md,
+    ...shadows.card,
+  },
+  statusOpen: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  statusClosed: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger,
+  },
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusText: { flex: 1 },
+  statusTitle: { ...typography.h3, color: colors.text, fontWeight: '800' },
+  statusDesc: { ...typography.caption, color: colors.textSecondary },
+  geoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: colors.primarySoft,
+  },
+  geoBtnDisabled: { opacity: 0.6 },
+  geoBtnText: {
     ...typography.bodySmall,
-    color: colors.text,
-    flex: 1,
-    marginRight: spacing.sm,
+    color: colors.primary,
+    fontWeight: '700',
   },
-  sectionHint: {
+  geoHint: {
     ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
   },
   coordsRow: { flexDirection: 'row', gap: spacing.md },
   coordField: { flex: 1 },
-  logout: { marginTop: spacing.md },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+    marginTop: spacing.sm,
+  },
+  footerSave: { flex: 1, minWidth: 180 },
 });

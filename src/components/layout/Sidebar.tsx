@@ -42,7 +42,8 @@ const MAIN_ITEMS: NavItem[] = [
 ];
 
 const FOOTER_ITEMS: NavItem[] = [
-  { key: 'Configuracion', label: 'Configuración', icon: 'settings' },
+  { key: 'Configuracion', label: 'Editar perfil', icon: 'edit-2' },
+  { key: 'Preferencias', label: 'Preferencias', icon: 'sliders' },
 ];
 
 export const SIDEBAR_WIDTH = 260;

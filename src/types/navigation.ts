@@ -22,6 +22,7 @@ export type MainStackParamList = {
   Clientes: undefined;
   Notificaciones: undefined;
   Configuracion: undefined;
+  Preferencias: undefined;
 };
 
 export type RootStackParamList = {

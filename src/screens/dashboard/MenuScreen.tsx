@@ -10,7 +10,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
@@ -26,6 +25,8 @@ import type { Product } from '../../types/product';
 import type { RootStackParamList } from '../../types/navigation';
 import { colors, radius, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
+import { formatCurrency, formatNumber } from '../../utils/format';
+import { notifyError, notifyInfo } from '../../utils/notify';
 
 type ListItem = { type: 'product'; data: Product } | { type: 'add' };
 
@@ -44,7 +45,8 @@ export function MenuScreen() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const numColumns = width >= 1100 ? 3 : width >= 720 ? 2 : 1;
+  const numColumns =
+    width >= 1280 ? 4 : width >= 1000 ? 3 : width >= 680 ? 2 : 1;
   const horizontalPadding = spacing.md * 2;
   const gap = spacing.md;
   const cardWidth =
@@ -100,7 +102,7 @@ export function MenuScreen() {
       try {
         await removeProduct(id);
       } catch {
-        Alert.alert('Error', 'No se pudo eliminar el producto');
+        notifyError('No se pudo eliminar el producto');
       }
     }
   };
@@ -125,9 +127,9 @@ export function MenuScreen() {
               title="Filtros"
               variant="outline"
               onPress={() =>
-                Alert.alert(
-                  'Filtros',
-                  'Usa las pestañas de categoría debajo para filtrar el menú.'
+                notifyInfo(
+                  'Usa las pestañas de categoría debajo para filtrar el menú.',
+                  'Filtros'
                 )
               }
               style={styles.actionBtn}
@@ -136,9 +138,9 @@ export function MenuScreen() {
               title="Exportar PDF"
               variant="outline"
               onPress={() =>
-                Alert.alert(
-                  'Próximamente',
-                  'La exportación a PDF estará disponible en una próxima versión.'
+                notifyInfo(
+                  'La exportación a PDF estará disponible en una próxima versión.',
+                  'Próximamente'
                 )
               }
               style={styles.actionBtn}
@@ -153,56 +155,61 @@ export function MenuScreen() {
 
         <View style={styles.metrics}>
           <MetricCard
+            variant="compact"
             label="Total platillos"
-            value={String(products.length)}
+            value={formatNumber(products.length)}
             icon="grid"
             tone="primary"
           />
           <MetricCard
+            variant="compact"
             label="Categorías activas"
-            value={String(categories.length)}
+            value={formatNumber(categories.length)}
             icon="layers"
             tone="info"
           />
           <MetricCard
+            variant="compact"
             label="Agotados"
-            value={String(outOfStock)}
-            icon="alert-triangle"
-            tone="danger"
+            value={formatNumber(outOfStock)}
+            icon={outOfStock > 0 ? undefined : 'check-circle'}
+            tone={outOfStock > 0 ? 'danger' : 'success'}
             danger={outOfStock > 0}
-            badge={outOfStock > 0 ? 'Requiere atención' : undefined}
-            badgeTone="priority"
+            hint={outOfStock > 0 ? 'Requiere atención' : undefined}
           />
           <MetricCard
+            variant="compact"
             label="Precio promedio"
-            value={`$${avgPrice.toFixed(2)}`}
+            value={formatCurrency(avgPrice)}
             icon="tag"
             tone="success"
           />
         </View>
 
-        <FlatList
-          horizontal
-          data={[{ id: 'all', name: 'Todos' }, ...categories]}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
-          renderItem={({ item }) => {
-            const active = categoryFilter === item.id;
-            return (
-              <TouchableOpacity
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={() => setCategoryFilter(item.id)}
-              >
-                <Text
-                  style={[styles.chipText, active && styles.chipTextActive]}
+        <View style={styles.tabsWrap}>
+          <FlatList
+            horizontal
+            data={[{ id: 'all', name: 'Todos' }, ...categories]}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
+            renderItem={({ item }) => {
+              const active = categoryFilter === item.id;
+              return (
+                <TouchableOpacity
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setCategoryFilter(item.id)}
                 >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
       </View>
 
       <FlatList
@@ -295,24 +302,27 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  chips: { gap: spacing.sm, paddingBottom: spacing.sm },
+  tabsWrap: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginHorizontal: -spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  chips: { gap: spacing.xs, paddingBottom: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginRight: spacing.xs,
   },
   chipActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   chipText: {
     ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: '600',
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
   chipTextActive: { color: colors.textOnPrimary },
   list: {

@@ -9,13 +9,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
 import { InputField } from './InputField';
 import { colors, radius, spacing, typography } from '../utils/theme';
+import { notifyError } from '../utils/notify';
 
 export interface AvatarPickerValue {
   previewUri: string | null;
@@ -43,9 +43,9 @@ export function AvatarPicker({
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a la galería para la foto.'
+      notifyError(
+        'Necesitamos acceso a la galería para la foto.',
+        'Permiso requerido'
       );
       return;
     }

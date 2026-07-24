@@ -73,6 +73,7 @@ export function ScreenShell({
             searchPlaceholder={searchPlaceholder}
             onSearchChange={onSearchChange}
             onEditProfile={() => navigation.navigate('Configuracion')}
+            onPreferences={() => navigation.navigate('Preferencias')}
             onLogout={handleLogout}
           />
           <View style={styles.content}>{children}</View>

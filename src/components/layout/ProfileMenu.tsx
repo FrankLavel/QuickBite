@@ -28,6 +28,7 @@ interface ProfileMenuProps {
   photoUri?: string | null;
   email?: string;
   onEditProfile: () => void;
+  onPreferences: () => void;
   onLogout: () => void;
 }
 
@@ -48,6 +49,7 @@ export function ProfileMenu({
   photoUri,
   email,
   onEditProfile,
+  onPreferences,
   onLogout,
 }: ProfileMenuProps) {
   const avatarUri = getProfileAvatarUri(
@@ -67,12 +69,12 @@ export function ProfileMenu({
       },
     },
     {
-      key: 'settings',
-      label: 'Configuración',
-      icon: 'settings',
+      key: 'preferences',
+      label: 'Preferencias',
+      icon: 'sliders',
       onPress: () => {
         onClose();
-        onEditProfile();
+        onPreferences();
       },
     },
     {

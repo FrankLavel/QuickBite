@@ -23,6 +23,7 @@ interface AppHeaderProps {
   searchPlaceholder?: string;
   onSearchChange?: (text: string) => void;
   onEditProfile?: () => void;
+  onPreferences?: () => void;
   onLogout?: () => void;
 }
 
@@ -32,6 +33,7 @@ export function AppHeader({
   searchPlaceholder = 'Buscar pedidos, menús o clientes...',
   onSearchChange,
   onEditProfile,
+  onPreferences,
   onLogout,
 }: AppHeaderProps) {
   const { restaurant, user } = useAuth();
@@ -109,6 +111,7 @@ export function AppHeader({
         photoUri={user?.photoURL}
         email={user?.email}
         onEditProfile={() => onEditProfile?.()}
+        onPreferences={() => onPreferences?.()}
         onLogout={() => onLogout?.()}
       />
     </View>

@@ -19,6 +19,10 @@ interface MiniBarChartProps {
   color?: string;
   /** Formatea el valor mostrado sobre la barra más alta / al tocar. */
   valueFormatter?: (v: number) => string;
+  /** Oculta los valores sobre cada barra (útil en series largas). */
+  showValues?: boolean;
+  /** Muestra la etiqueta solo cada N puntos (1 = todas). */
+  labelInterval?: number;
 }
 
 export function MiniBarChart({
@@ -26,25 +30,34 @@ export function MiniBarChart({
   height = 160,
   color = colors.primary,
   valueFormatter = (v) => String(v),
+  showValues = true,
+  labelInterval = 1,
 }: MiniBarChartProps) {
   const max = Math.max(1, ...data.map((d) => d.value));
   const hasData = data.some((d) => d.value > 0);
+  // En series largas las barras se juntan para que quepan sin verse raquíticas.
+  const dense = data.length > 14;
+  const gap = dense ? 3 : spacing.sm;
+  const topSpace = showValues ? 28 : 8;
 
   return (
     <View>
-      <View style={[styles.plot, { height }]}>
+      <View style={[styles.plot, { height, gap }]}>
         {data.map((point, idx) => {
           const ratio = point.value / max;
-          const barHeight = Math.max(4, Math.round(ratio * (height - 28)));
+          const barHeight = Math.max(4, Math.round(ratio * (height - topSpace)));
           const isPeak = point.value === max && point.value > 0;
           return (
             <View key={`${point.label}-${idx}`} style={styles.col}>
-              <Text style={styles.value}>
-                {point.value > 0 ? valueFormatter(point.value) : ''}
-              </Text>
+              {showValues ? (
+                <Text style={styles.value}>
+                  {point.value > 0 ? valueFormatter(point.value) : ''}
+                </Text>
+              ) : null}
               <View
                 style={[
                   styles.bar,
+                  dense && styles.barDense,
                   {
                     height: barHeight,
                     backgroundColor: isPeak ? color : colors.primarySoft,
@@ -57,12 +70,20 @@ export function MiniBarChart({
         })}
       </View>
 
-      <View style={styles.labels}>
-        {data.map((point, idx) => (
-          <Text key={`${point.label}-l-${idx}`} style={styles.label}>
-            {point.label}
-          </Text>
-        ))}
+      <View style={[styles.labels, { gap }]}>
+        {data.map((point, idx) => {
+          const show =
+            idx % labelInterval === 0 || idx === data.length - 1;
+          return (
+            <Text
+              key={`${point.label}-l-${idx}`}
+              style={styles.label}
+              numberOfLines={1}
+            >
+              {show ? point.label : ''}
+            </Text>
+          );
+        })}
       </View>
 
       {!hasData ? (
@@ -78,7 +99,6 @@ const styles = StyleSheet.create({
   plot: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: spacing.sm,
   },
   col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   value: {
@@ -94,9 +114,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.sm,
     borderWidth: 1,
   },
+  barDense: { width: '100%' },
   labels: {
     flexDirection: 'row',
-    gap: spacing.sm,
     marginTop: spacing.sm,
   },
   label: {

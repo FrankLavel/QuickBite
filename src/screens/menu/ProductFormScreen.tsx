@@ -11,7 +11,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Switch,
   useWindowDimensions,
 } from 'react-native';
@@ -27,6 +26,7 @@ import { SectionCard } from '../../components/SectionCard';
 import { isValidPrice } from '../../utils/validation';
 import type { ProductFormData } from '../../types/product';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import { notifyError } from '../../utils/notify';
 
 const emptyForm: ProductFormData = {
   name: '',
@@ -93,9 +93,9 @@ export function ProductFormScreen({
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitamos acceso a la galería para la imagen del platillo.'
+      notifyError(
+        'Necesitamos acceso a la galería para la imagen del platillo.',
+        'Permiso requerido'
       );
       return;
     }
@@ -129,7 +129,7 @@ export function ProductFormScreen({
       updateField('categoryId', cat.id);
       setNewCategory('');
     } catch {
-      Alert.alert('Error', 'No se pudo crear la categoría');
+      notifyError('No se pudo crear la categoría');
     }
   };
 
@@ -196,7 +196,7 @@ export function ProductFormScreen({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo guardar el producto';
-      Alert.alert('Error', message);
+      notifyError(message);
     } finally {
       setSubmitting(false);
       setStatusMessage('');

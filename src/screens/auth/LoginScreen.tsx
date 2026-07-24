@@ -15,7 +15,6 @@ import {
   useWindowDimensions,
   Switch,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -29,6 +28,7 @@ import { isFirebaseConfigured } from '../../services/firebase';
 import { sendRestaurantPasswordReset } from '../../services/authService';
 import { googleWebClientId } from '../../../firebase.config';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import { notifySuccess, notifyError } from '../../utils/notify';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -99,20 +99,12 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
       await sendRestaurantPasswordReset(email);
       const msg =
         'Te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja (y spam).';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Correo enviado', msg);
-      }
+      notifySuccess(msg, 'Correo enviado');
       setResetMessage(msg);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudo enviar el correo';
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert('No se pudo enviar', message);
-      }
+      notifyError(message, 'No se pudo enviar');
     }
   };
 
