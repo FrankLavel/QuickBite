@@ -19,12 +19,12 @@ interface HeatMapProps {
   columnLabelInterval?: number;
 }
 
-/** Escalones de intensidad, de menor a mayor. */
+/** Escalones de intensidad, de menor a mayor. Siguen el tema activo. */
 const STEPS = [
   colors.surfaceMuted,
-  '#d7efe0',
-  '#9bd9b5',
-  '#4cb87c',
+  colors.heat1,
+  colors.heat2,
+  colors.heat3,
   colors.primary,
 ];
 

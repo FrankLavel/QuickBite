@@ -99,11 +99,25 @@ const DOT_COLORS: Record<string, string> = {
   cancelled: colors.danger,
 };
 
+/** Coincidencia de búsqueda: folio, cliente, teléfono, dirección o artículos. */
+function matchesOrder(order: Order, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    order.id.toLowerCase().includes(q) ||
+    (order.customerName ?? '').toLowerCase().includes(q) ||
+    (order.customerPhone ?? '').toLowerCase().includes(q) ||
+    order.deliveryAddress.street.toLowerCase().includes(q) ||
+    order.items.some((i) => i.name.toLowerCase().includes(q))
+  );
+}
+
 export function OrdersScreen() {
   const { orders, loading, refresh, setStatus } = useOrders();
   const { width } = useWindowDimensions();
   const wide = width >= 1024;
   const [filter, setFilter] = useState<Filter>('activos');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const groups = useMemo(() => {
     const active = orders.filter((o) =>
@@ -140,12 +154,15 @@ export function OrdersScreen() {
     return { active, scheduled, ready, preparing, delivered, successRate };
   }, [orders]);
 
-  const filtered =
-    filter === 'listos'
-      ? groups.ready
-      : filter === 'programados'
-        ? groups.scheduled
-        : groups.active;
+  const filtered = useMemo(() => {
+    const base =
+      filter === 'listos'
+        ? groups.ready
+        : filter === 'programados'
+          ? groups.scheduled
+          : groups.active;
+    return base.filter((o) => matchesOrder(o, searchQuery));
+  }, [filter, groups, searchQuery]);
 
   const recentLog = useMemo(
     () =>
@@ -190,7 +207,10 @@ export function OrdersScreen() {
   ];
 
   return (
-    <ScreenShell searchPlaceholder="Buscar pedidos, clientes o artículos...">
+    <ScreenShell
+      searchPlaceholder="Buscar pedidos, clientes o artículos..."
+      onSearchChange={setSearchQuery}
+    >
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={

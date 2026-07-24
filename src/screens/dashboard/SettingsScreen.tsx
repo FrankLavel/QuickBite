@@ -226,7 +226,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <ScreenShell searchPlaceholder="Buscar en configuración...">
+    <ScreenShell>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.pageHead}>
           <View style={styles.pageHeadText}>

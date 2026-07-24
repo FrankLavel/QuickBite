@@ -171,7 +171,7 @@ export function HomeScreen() {
   const recent = useMemo(() => orders.slice(0, 6), [orders]);
 
   return (
-    <ScreenShell searchPlaceholder="Buscar pedidos, menús o clientes...">
+    <ScreenShell>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={

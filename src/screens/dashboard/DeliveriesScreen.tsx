@@ -77,6 +77,7 @@ export function DeliveriesScreen() {
   const { orders, loading, refresh, setStatus } = useOrders();
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<Filter>('esperando');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const groups = useMemo(() => {
     const waiting = orders.filter((o) => o.status === ORDER_STATUS.READY);
@@ -94,12 +95,24 @@ export function DeliveriesScreen() {
     return { waiting, enRoute, delivered, deliveredToday };
   }, [orders]);
 
-  const list =
-    filter === 'esperando'
-      ? groups.waiting
-      : filter === 'en_camino'
-        ? groups.enRoute
-        : groups.delivered;
+  const list = useMemo(() => {
+    const base =
+      filter === 'esperando'
+        ? groups.waiting
+        : filter === 'en_camino'
+          ? groups.enRoute
+          : groups.delivered;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter(
+      (o) =>
+        o.id.toLowerCase().includes(q) ||
+        (o.customerName ?? '').toLowerCase().includes(q) ||
+        (o.customerPhone ?? '').toLowerCase().includes(q) ||
+        o.deliveryAddress.street.toLowerCase().includes(q) ||
+        (o.deliveryAddress.city ?? '').toLowerCase().includes(q)
+    );
+  }, [filter, groups, searchQuery]);
 
   const tabs: [Filter, string, number][] = [
     ['esperando', 'Esperando salida', groups.waiting.length],
@@ -129,7 +142,10 @@ export function DeliveriesScreen() {
   };
 
   return (
-    <ScreenShell searchPlaceholder="Buscar pedidos o direcciones...">
+    <ScreenShell
+      searchPlaceholder="Buscar pedidos o direcciones..."
+      onSearchChange={setSearchQuery}
+    >
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={

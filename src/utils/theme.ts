@@ -41,6 +41,10 @@ export interface Palette {
   infoSoft: string;
   border: string;
   overlay: string;
+  /** Pasos intermedios del degradado del mapa de calor (bajo → alto). */
+  heat1: string;
+  heat2: string;
+  heat3: string;
 }
 
 /** Paleta clara — verdes del mockup oficial (valores originales). */
@@ -73,6 +77,9 @@ export const lightPalette: Palette = {
   infoSoft: '#DBEAFE',
   border: 'rgba(31, 41, 55, 0.12)',
   overlay: 'rgba(31, 41, 55, 0.45)',
+  heat1: '#d7efe0',
+  heat2: '#9bd9b5',
+  heat3: '#4cb87c',
 };
 
 /** Paleta oscura — superficies slate + acentos aclarados para contraste. */
@@ -105,6 +112,10 @@ export const darkPalette: Palette = {
   infoSoft: 'rgba(96, 165, 250, 0.16)',
   border: 'rgba(255, 255, 255, 0.10)',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  // Verde de marca con opacidad creciente sobre la superficie oscura.
+  heat1: 'rgba(34, 197, 94, 0.22)',
+  heat2: 'rgba(34, 197, 94, 0.45)',
+  heat3: 'rgba(34, 197, 94, 0.70)',
 };
 
 const KEYS = Object.keys(lightPalette) as Array<keyof Palette>;

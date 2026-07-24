@@ -34,6 +34,7 @@ import {
   formatPercent,
   type MetricDelta,
 } from '../../utils/format';
+import { downloadCsv, fileDateStamp } from '../../utils/exportCsv';
 
 type FeatherIconName = ComponentProps<typeof Feather>['name'];
 type Filter = 'all' | 'new' | 'frequent' | 'risk';
@@ -113,7 +114,7 @@ export function CustomersScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const data = useMemo(() => {
     const now = new Date();
@@ -247,17 +248,28 @@ export function CustomersScreen() {
   }, [orders, products]);
 
   const filtered = useMemo(() => {
+    let list: CustomerRow[];
     switch (filter) {
       case 'new':
-        return data.customers.filter((c) => c.status === 'new');
+        list = data.customers.filter((c) => c.status === 'new');
+        break;
       case 'frequent':
-        return data.customers.filter((c) => c.orders >= VIP_ORDERS);
+        list = data.customers.filter((c) => c.orders >= VIP_ORDERS);
+        break;
       case 'risk':
-        return data.customers.filter((c) => c.status === 'risk');
+        list = data.customers.filter((c) => c.status === 'risk');
+        break;
       default:
-        return data.customers;
+        list = data.customers;
     }
-  }, [data.customers, filter]);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.phone ?? '').toLowerCase().includes(q)
+    );
+  }, [data.customers, filter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -267,6 +279,34 @@ export function CustomersScreen() {
   );
   const from = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
   const to = Math.min(filtered.length, (safePage + 1) * PAGE_SIZE);
+
+  /** Genera el CSV de una lista de clientes. */
+  const exportCustomers = (rowsIn: CustomerRow[], label: string) => {
+    const now = new Date();
+    const rows: Array<Array<string | number>> = [
+      [
+        'Cliente',
+        'Teléfono',
+        'Estado',
+        'Pedidos',
+        'Valor total',
+        'Ticket promedio',
+        'Primer pedido',
+        'Último pedido',
+      ],
+      ...rowsIn.map((c) => [
+        c.name,
+        c.phone ?? '',
+        STATUS_META[c.status].label,
+        c.orders,
+        c.lifetimeValue.toFixed(2),
+        (c.orders > 0 ? c.lifetimeValue / c.orders : 0).toFixed(2),
+        c.firstOrder ? c.firstOrder.toLocaleDateString('es-MX') : '',
+        c.lastOrder ? c.lastOrder.toLocaleDateString('es-MX') : '',
+      ]),
+    ];
+    downloadCsv(`${label}-${fileDateStamp(now)}`, rows);
+  };
 
   const changeFilter = (f: Filter) => {
     setFilter(f);
@@ -285,7 +325,13 @@ export function CustomersScreen() {
   const maxTag = data.topTags[0]?.[1] ?? 1;
 
   return (
-    <ScreenShell searchPlaceholder="Buscar clientes por nombre o teléfono...">
+    <ScreenShell
+      searchPlaceholder="Buscar clientes por nombre o teléfono..."
+      onSearchChange={(t) => {
+        setSearchQuery(t);
+        setPage(0);
+      }}
+    >
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -306,9 +352,7 @@ export function CustomersScreen() {
                 <TouchableOpacity
                   style={styles.heroBtnLight}
                   onPress={() =>
-                    setNote(
-                      'La exportación de datos CRM estará disponible en una próxima versión.'
-                    )
+                    exportCustomers(data.customers, 'crm-clientes')
                   }
                 >
                   <Text style={styles.heroBtnLightText}>Exportar CRM</Text>
@@ -320,7 +364,6 @@ export function CustomersScreen() {
                   <Text style={styles.heroBtnSolidText}>Nueva campaña</Text>
                 </TouchableOpacity>
               </View>
-              {note ? <Text style={styles.heroNote}>{note}</Text> : null}
             </View>
           </View>
 
@@ -369,11 +412,7 @@ export function CustomersScreen() {
           </View>
           <TouchableOpacity
             style={styles.csvBtn}
-            onPress={() =>
-              setNote(
-                'La descarga en CSV estará disponible en una próxima versión.'
-              )
-            }
+            onPress={() => exportCustomers(filtered, 'clientes')}
           >
             <Feather name="download" size={14} color={colors.textSecondary} />
             <Text style={styles.csvText}>Descargar CSV</Text>
@@ -753,11 +792,6 @@ const styles = StyleSheet.create({
     // que el texto no debe seguir la paleta (evita verde-sobre-verde en oscuro).
     color: '#065a28',
     fontWeight: '800',
-  },
-  heroNote: {
-    ...typography.caption,
-    color: colors.textSoft,
-    marginTop: spacing.sm,
   },
 
   statCard: {

@@ -43,6 +43,25 @@ export function PromotionsScreen() {
   } = usePromotions();
 
   const [tab, setTab] = useState<Tab>('coupons');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const visibleCoupons = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return coupons;
+    return coupons.filter((c) => c.code.toLowerCase().includes(q));
+  }, [coupons, searchQuery]);
+
+  const visibleOffers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return offers;
+    return offers.filter(
+      (o) =>
+        o.title.toLowerCase().includes(q) ||
+        o.description.toLowerCase().includes(q) ||
+        o.badge.toLowerCase().includes(q) ||
+        (o.couponCode ?? '').toLowerCase().includes(q)
+    );
+  }, [offers, searchQuery]);
 
   const activeCoupons = useMemo(
     () => coupons.filter((c) => c.isActive).length,
@@ -82,7 +101,10 @@ export function PromotionsScreen() {
   };
 
   return (
-    <ScreenShell searchPlaceholder="Buscar cupones o banners...">
+    <ScreenShell
+      searchPlaceholder="Buscar cupones o banners..."
+      onSearchChange={setSearchQuery}
+    >
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -165,18 +187,21 @@ export function PromotionsScreen() {
         </View>
 
         {tab === 'coupons' ? (
-          coupons.length === 0 ? (
+          visibleCoupons.length === 0 ? (
             <View style={styles.empty}>
               <Feather name="tag" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>Sin cupones</Text>
+              <Text style={styles.emptyTitle}>
+                {searchQuery.trim() ? 'Sin resultados' : 'Sin cupones'}
+              </Text>
               <Text style={styles.emptyText}>
-                Crea un cupón con tipo de descuento, pedido mínimo, usos máximos
-                y fecha de vencimiento.
+                {searchQuery.trim()
+                  ? 'Ningún cupón coincide con tu búsqueda.'
+                  : 'Crea un cupón con tipo de descuento, pedido mínimo, usos máximos y fecha de vencimiento.'}
               </Text>
             </View>
           ) : (
             <View style={styles.grid}>
-              {coupons.map((item) => (
+              {visibleCoupons.map((item) => (
                 <View key={item.code} style={styles.couponWrap}>
                   <CouponCard
                     coupon={item}
@@ -190,18 +215,21 @@ export function PromotionsScreen() {
               ))}
             </View>
           )
-        ) : offers.length === 0 ? (
+        ) : visibleOffers.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="image" size={40} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>Sin banners</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery.trim() ? 'Sin resultados' : 'Sin banners'}
+            </Text>
             <Text style={styles.emptyText}>
-              Publica banners en el Home de la app. Puedes vincular un cupón
-              opcional.
+              {searchQuery.trim()
+                ? 'Ningún banner coincide con tu búsqueda.'
+                : 'Publica banners en el Home de la app. Puedes vincular un cupón opcional.'}
             </Text>
           </View>
         ) : (
           <View style={styles.grid}>
-            {offers.map((item) => (
+            {visibleOffers.map((item) => (
               <View key={item.id} style={styles.offerWrap}>
                 <OfferCard
                   offer={item}

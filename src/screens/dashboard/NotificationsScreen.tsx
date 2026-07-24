@@ -6,7 +6,8 @@
  * del restaurante en Firestore).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -65,6 +66,9 @@ const TONE_COLORS: Record<Tone, { bg: string; fg: string }> = {
   warning: { bg: colors.warningSoft, fg: colors.warning },
   danger: { bg: colors.dangerSoft, fg: colors.danger },
 };
+
+/** Avisos marcados como leídos, guardados en el dispositivo. */
+const READ_STORAGE_KEY = '@quickbite/alerts-read';
 
 const CATEGORY_LABELS: Record<Category, string> = {
   order: 'Pedido',
@@ -138,7 +142,9 @@ export function NotificationsScreen() {
 
   const [tab, setTab] = useState<Tab>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [readLoaded, setReadLoaded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const alerts = useMemo<AlertItem[]>(() => {
     const now = new Date();
@@ -299,6 +305,43 @@ export function NotificationsScreen() {
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [orders, products, coupons, offers]);
 
+  // Referencia a las alertas vigentes, para podar al guardar sin re-ejecutar
+  // el efecto cada vez que cambian los pedidos.
+  const alertsRef = useRef<AlertItem[]>(alerts);
+  alertsRef.current = alerts;
+
+  // Carga inicial del estado "leído" desde el dispositivo.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(READ_STORAGE_KEY);
+        if (!cancelled && raw) {
+          setReadIds(new Set(JSON.parse(raw) as string[]));
+        }
+      } catch {
+        // Si falla la lectura se arranca sin nada marcado como leído.
+      }
+      if (!cancelled) setReadLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persiste al cambiar, descartando ids de avisos que ya no existen para que
+  // el almacenamiento no crezca indefinidamente.
+  useEffect(() => {
+    if (!readLoaded) return;
+    const alive = new Set(alertsRef.current.map((a) => a.id));
+    const pruned = Array.from(readIds).filter((id) => alive.has(id));
+    AsyncStorage.setItem(READ_STORAGE_KEY, JSON.stringify(pruned)).catch(
+      () => {
+        // Persistencia best-effort; el estado ya aplica en memoria.
+      }
+    );
+  }, [readIds, readLoaded]);
+
   const counts = useMemo(() => {
     const now = new Date();
     const unread = alerts.filter((a) => !readIds.has(a.id)).length;
@@ -309,10 +352,16 @@ export function NotificationsScreen() {
     return { unread, ordersToday, systemIssues };
   }, [alerts, readIds]);
 
-  const filtered = useMemo(
-    () => (tab === 'all' ? alerts : alerts.filter((a) => a.category === tab)),
-    [alerts, tab]
-  );
+  const filtered = useMemo(() => {
+    const byTab =
+      tab === 'all' ? alerts : alerts.filter((a) => a.category === tab);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return byTab;
+    return byTab.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q)
+    );
+  }, [alerts, tab, searchQuery]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -388,7 +437,13 @@ export function NotificationsScreen() {
   })();
 
   return (
-    <ScreenShell searchPlaceholder="Buscar alertas o pedidos...">
+    <ScreenShell
+      searchPlaceholder="Buscar alertas o pedidos..."
+      onSearchChange={(t) => {
+        setSearchQuery(t);
+        setVisibleCount(8);
+      }}
+    >
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={

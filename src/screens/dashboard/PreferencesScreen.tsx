@@ -30,7 +30,7 @@ export function PreferencesScreen() {
   const prefs = usePreferences();
 
   return (
-    <ScreenShell searchPlaceholder="Buscar en preferencias...">
+    <ScreenShell>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.pageHead}>
           <Text style={styles.title}>Preferencias</Text>

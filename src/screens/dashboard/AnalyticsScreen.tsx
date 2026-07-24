@@ -36,7 +36,7 @@ import {
   formatNumber,
   formatPercent,
 } from '../../utils/format';
-import { notifyInfo } from '../../utils/notify';
+import { downloadCsv, fileDateStamp } from '../../utils/exportCsv';
 
 type Period = 7 | 30 | 90;
 
@@ -249,6 +249,30 @@ export function AnalyticsScreen() {
       ? `El pico de pedidos es ${DAY_LABELS[data.peak.day]} alrededor de las ${hourLabel(data.peak.hour)} (${data.peak.count} pedidos). Considera reforzar cocina y reparto en esa franja.`
       : 'Aún no hay suficientes pedidos para detectar un patrón de horas pico. Vuelve a revisar cuando tengas más actividad.';
 
+  /** Exporta el reporte del periodo: KPIs, serie de ingresos y más vendidos. */
+  const exportReport = () => {
+    const rows: Array<Array<string | number>> = [
+      ['Reporte QuickBite', `Últimos ${period} días`],
+      [],
+      ['Indicador', 'Valor'],
+      ['Ingresos totales', data.revenue.toFixed(2)],
+      ['Pedidos totales', data.totalOrders],
+      ['Ticket promedio', data.avg.toFixed(2)],
+      ['Eficiencia (%)', data.efficiency.toFixed(0)],
+      ['Clientes recurrentes (%)', data.returningPct.toFixed(1)],
+      ['Pago en línea (%)', data.onlinePct.toFixed(1)],
+      [],
+      ['Ingresos por periodo', ''],
+      ['Fecha', 'Ingresos'],
+      ...data.series.map((p) => [p.label, p.value.toFixed(2)]),
+      [],
+      ['Más vendidos', ''],
+      ['Platillo', 'Unidades', 'Ingresos'],
+      ...data.bestSellers.map((b) => [b.name, b.qty, b.revenue.toFixed(2)]),
+    ];
+    downloadCsv(`analiticas-${period}d-${fileDateStamp()}`, rows);
+  };
+
   const periods: [Period, string][] = [
     [7, '7 días'],
     [30, '30 días'],
@@ -256,7 +280,7 @@ export function AnalyticsScreen() {
   ];
 
   return (
-    <ScreenShell searchPlaceholder="Buscar analíticas...">
+    <ScreenShell>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -295,12 +319,7 @@ export function AnalyticsScreen() {
             <Button
               title="Exportar"
               variant="outline"
-              onPress={() =>
-                notifyInfo(
-                  'La exportación del reporte estará disponible en una próxima versión.',
-                  'Próximamente'
-                )
-              }
+              onPress={exportReport}
             />
           </View>
         </View>

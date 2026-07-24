@@ -63,20 +63,26 @@ export function AppHeader({
         <View style={styles.menuSpacer} />
       )}
 
-      <View style={styles.search}>
-        <Feather
-          name="search"
-          size={18}
-          color={colors.textMuted}
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={searchPlaceholder}
-          placeholderTextColor={colors.textMuted}
-          onChangeText={onSearchChange}
-        />
-      </View>
+      {/* La búsqueda solo se muestra si la pantalla la implementa, para no
+          ofrecer un campo que no filtra nada. */}
+      {onSearchChange ? (
+        <View style={styles.search}>
+          <Feather
+            name="search"
+            size={18}
+            color={colors.textMuted}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.textMuted}
+            onChangeText={onSearchChange}
+          />
+        </View>
+      ) : (
+        <View style={styles.searchSpacer} />
+      )}
 
       <View
         style={[styles.status, isOpen ? styles.statusOpen : styles.statusClosed]}
@@ -152,6 +158,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  searchSpacer: { flex: 1 },
   searchIcon: { marginRight: spacing.sm },
   searchInput: {
     flex: 1,

@@ -27,6 +27,7 @@ import { colors, radius, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { notifyError, notifyInfo } from '../../utils/notify';
+import { downloadCsv, fileDateStamp } from '../../utils/exportCsv';
 
 type ListItem = { type: 'product'; data: Product } | { type: 'add' };
 
@@ -109,6 +110,22 @@ export function MenuScreen() {
 
   const openNewProduct = () => navigation.navigate('ProductForm', {});
 
+  /** Exporta el catálogo visible (respeta categoría y búsqueda activas). */
+  const exportMenu = () => {
+    const rows: Array<Array<string | number>> = [
+      ['Platillo', 'Categoría', 'Precio', 'Disponible', 'Etiquetas', 'Descripción'],
+      ...filtered.map((p) => [
+        p.name,
+        categoryMap[p.categoryId] ?? '',
+        p.price,
+        p.isAvailable ? 'Sí' : 'No',
+        p.tags.join(' / '),
+        p.description,
+      ]),
+    ];
+    downloadCsv(`menu-quickbite-${fileDateStamp()}`, rows);
+  };
+
   return (
     <ScreenShell
       searchPlaceholder="Buscar platillos, ingredientes o categorías..."
@@ -135,14 +152,9 @@ export function MenuScreen() {
               style={styles.actionBtn}
             />
             <Button
-              title="Exportar PDF"
+              title="Exportar CSV"
               variant="outline"
-              onPress={() =>
-                notifyInfo(
-                  'La exportación a PDF estará disponible en una próxima versión.',
-                  'Próximamente'
-                )
-              }
+              onPress={exportMenu}
               style={styles.actionBtn}
             />
             <Button
