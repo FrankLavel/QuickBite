@@ -42,7 +42,6 @@ export function OfferFormScreen({
 
   const [form, setForm] = useState<OfferFormData>(emptyForm);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -52,7 +51,6 @@ export function OfferFormScreen({
       if (existing) {
         setForm(existing);
         setPreviewUri(existing.image || null);
-        setImageMode(existing.image ? 'url' : 'upload');
       }
     }
   }, [offerId, getOfferForm]);
@@ -82,18 +80,9 @@ export function OfferFormScreen({
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       setPreviewUri(uri);
-      setImageMode('upload');
       updateField('image', '');
       updateField('localImageUri', uri);
     }
-  };
-
-  const handleImageUrlChange = (value: string) => {
-    const trimmed = value.trim();
-    updateField('image', trimmed);
-    updateField('localImageUri', undefined);
-    setPreviewUri(trimmed || null);
-    if (trimmed) setImageMode('url');
   };
 
   const validate = (): boolean => {
@@ -103,7 +92,7 @@ export function OfferFormScreen({
       next.description = 'La descripción es obligatoria';
     }
     if (!previewUri && !form.image.trim()) {
-      next.image = 'Sube una imagen o ingresa una URL';
+      next.image = 'Sube una imagen para el banner';
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -138,69 +127,18 @@ export function OfferFormScreen({
     >
       <Text style={styles.sectionLabel}>IMAGEN DEL BANNER</Text>
 
-      <View style={styles.imageModeRow}>
-        <TouchableOpacity
-          style={[
-            styles.modeChip,
-            imageMode === 'upload' && styles.modeChipActive,
-          ]}
-          onPress={() => setImageMode('upload')}
-        >
-          <Text
-            style={[
-              styles.modeChipText,
-              imageMode === 'upload' && styles.modeChipTextActive,
-            ]}
-          >
-            Subir archivo
+      <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+        <ProductImage
+          uri={previewUri ?? form.image}
+          style={styles.bannerImage}
+        />
+        <View style={styles.imageOverlay}>
+          <Feather name="camera" size={20} color={colors.textOnPrimary} />
+          <Text style={styles.imageOverlayText}>
+            {previewUri ? 'Cambiar imagen' : 'Toca para subir imagen'}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.modeChip,
-            imageMode === 'url' && styles.modeChipActive,
-          ]}
-          onPress={() => setImageMode('url')}
-        >
-          <Text
-            style={[
-              styles.modeChipText,
-              imageMode === 'url' && styles.modeChipTextActive,
-            ]}
-          >
-            Usar URL
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {imageMode === 'upload' ? (
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-          <ProductImage
-            uri={previewUri ?? form.image}
-            style={styles.bannerImage}
-          />
-          <View style={styles.imageOverlay}>
-            <Feather name="camera" size={20} color={colors.textOnPrimary} />
-            <Text style={styles.imageOverlayText}>
-              {previewUri ? 'Cambiar imagen' : 'Toca para subir imagen'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      ) : (
-        <>
-          <InputField
-            label="URL de la imagen"
-            placeholder="https://ejemplo.com/banner.jpg"
-            value={form.image}
-            onChangeText={handleImageUrlChange}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-          {previewUri ? (
-            <ProductImage uri={previewUri} style={styles.urlPreview} />
-          ) : null}
-        </>
-      )}
+        </View>
+      </TouchableOpacity>
       {errors.image ? <Text style={styles.error}>{errors.image}</Text> : null}
 
       <InputField
@@ -299,29 +237,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-  imageModeRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  modeChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modeChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  modeChipText: {
-    ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  modeChipTextActive: { color: colors.textOnPrimary },
   imagePicker: {
     height: 180,
     borderRadius: radius.lg,
@@ -330,13 +245,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   bannerImage: { width: '100%', height: '100%' },
-  urlPreview: {
-    width: '100%',
-    height: 160,
-    borderRadius: radius.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.surfaceMuted,
-  },
   imageOverlay: {
     position: 'absolute',
     bottom: spacing.sm,

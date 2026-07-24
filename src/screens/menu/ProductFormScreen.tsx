@@ -53,7 +53,6 @@ export function ProductFormScreen({
 
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -78,7 +77,6 @@ export function ProductFormScreen({
           order: product.order,
         });
         setPreviewUri(product.imageURL || null);
-        setImageMode(product.imageURL ? 'url' : 'upload');
       }
     } else if (categories[0] && !form.categoryId) {
       setForm((prev) => ({ ...prev, categoryId: categories[0].id }));
@@ -108,18 +106,9 @@ export function ProductFormScreen({
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       setPreviewUri(uri);
-      setImageMode('upload');
       updateField('imageURL', '');
       updateField('localImageUri', uri);
     }
-  };
-
-  const handleImageUrlChange = (value: string) => {
-    const trimmed = value.trim();
-    updateField('imageURL', trimmed);
-    updateField('localImageUri', undefined);
-    setPreviewUri(trimmed || null);
-    if (trimmed) setImageMode('url');
   };
 
   const handleAddCategory = async () => {
@@ -363,68 +352,23 @@ export function ProductFormScreen({
         {/* ---------- DERECHA ---------- */}
         <View style={wide ? styles.colRight : styles.colFull}>
           <SectionCard title="Imagen del platillo" style={styles.cardGap}>
-            <View style={styles.imageModeRow}>
-              {(
-                [
-                  ['upload', 'Subir archivo'],
-                  ['url', 'Usar URL'],
-                ] as const
-              ).map(([key, label]) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    styles.modeChip,
-                    imageMode === key && styles.modeChipActive,
-                  ]}
-                  onPress={() => setImageMode(key)}
-                >
-                  <Text
-                    style={[
-                      styles.modeChipText,
-                      imageMode === key && styles.modeChipTextActive,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {imageMode === 'upload' ? (
-              <TouchableOpacity
-                style={styles.dropzone}
-                onPress={pickImage}
-                activeOpacity={0.85}
-              >
-                {previewUri ? (
-                  <ProductImage uri={previewUri} style={styles.dropzoneImg} />
-                ) : (
-                  <View style={styles.dropzoneEmpty}>
-                    <View style={styles.uploadIcon}>
-                      <Feather name="upload-cloud" size={22} color={colors.primary} />
-                    </View>
-                    <Text style={styles.dropzoneText}>
-                      Toca para subir imagen
-                    </Text>
-                    <Text style={styles.dropzoneHint}>JPG o PNG (máx. 5MB)</Text>
+            <TouchableOpacity
+              style={styles.dropzone}
+              onPress={pickImage}
+              activeOpacity={0.85}
+            >
+              {previewUri ? (
+                <ProductImage uri={previewUri} style={styles.dropzoneImg} />
+              ) : (
+                <View style={styles.dropzoneEmpty}>
+                  <View style={styles.uploadIcon}>
+                    <Feather name="upload-cloud" size={22} color={colors.primary} />
                   </View>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <>
-                <InputField
-                  label="URL de la imagen"
-                  placeholder="https://ejemplo.com/platillo.jpg"
-                  value={form.imageURL}
-                  onChangeText={handleImageUrlChange}
-                  autoCapitalize="none"
-                  keyboardType="url"
-                />
-                {previewUri ? (
-                  <ProductImage uri={previewUri} style={styles.urlPreview} />
-                ) : null}
-              </>
-            )}
+                  <Text style={styles.dropzoneText}>Toca para subir imagen</Text>
+                  <Text style={styles.dropzoneHint}>JPG o PNG (máx. 5MB)</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </SectionCard>
 
           {/* Vista previa en vivo */}
@@ -600,18 +544,6 @@ const styles = StyleSheet.create({
   },
   toppingNameInput: { flex: 1 },
   toppingPriceInput: { width: 110 },
-  imageModeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  modeChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeChipText: { ...typography.bodySmall, color: colors.text, fontWeight: '600' },
-  modeChipTextActive: { color: colors.textOnPrimary },
   dropzone: {
     height: 200,
     borderRadius: radius.lg,
@@ -636,13 +568,6 @@ const styles = StyleSheet.create({
   },
   dropzoneText: { ...typography.body, color: colors.text, fontWeight: '600' },
   dropzoneHint: { ...typography.caption, color: colors.textSecondary },
-  urlPreview: {
-    width: '100%',
-    height: 170,
-    borderRadius: radius.lg,
-    marginTop: spacing.md,
-    backgroundColor: colors.surfaceMuted,
-  },
   previewCard: {
     backgroundColor: colors.primary,
     borderRadius: radius.lg,

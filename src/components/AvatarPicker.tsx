@@ -1,9 +1,10 @@
 /**
  * AvatarPicker.tsx
- * Selector de avatar: subir imagen o pegar URL.
+ * Selector de avatar: la imagen se sube a Storage desde la galería.
+ * `imageURL` conserva la URL ya almacenada al editar un perfil existente.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -13,7 +14,6 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { UserAvatar } from './UserAvatar';
-import { InputField } from './InputField';
 import { colors, radius, spacing, typography } from '../utils/theme';
 import { notifyError } from '../utils/notify';
 
@@ -36,10 +36,6 @@ export function AvatarPicker({
   value,
   onChange,
 }: AvatarPickerProps) {
-  const [mode, setMode] = useState<'upload' | 'url'>(
-    value.imageURL && !value.localUri ? 'url' : 'upload'
-  );
-
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -64,18 +60,7 @@ export function AvatarPicker({
         imageURL: '',
         localUri: uri,
       });
-      setMode('upload');
     }
-  };
-
-  const handleUrlChange = (url: string) => {
-    const trimmed = url.trim();
-    onChange({
-      previewUri: trimmed || null,
-      imageURL: trimmed,
-      localUri: undefined,
-    });
-    if (trimmed) setMode('url');
   };
 
   return (
@@ -99,52 +84,13 @@ export function AvatarPicker({
           <Text style={styles.hintText}>
             Se muestra en el encabezado y en la app móvil como logo.
           </Text>
-          <View style={styles.modeRow}>
-            <TouchableOpacity
-              style={[styles.modeChip, mode === 'upload' && styles.modeActive]}
-              onPress={() => setMode('upload')}
-            >
-              <Text
-                style={[
-                  styles.modeText,
-                  mode === 'upload' && styles.modeTextActive,
-                ]}
-              >
-                Subir
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeChip, mode === 'url' && styles.modeActive]}
-              onPress={() => setMode('url')}
-            >
-              <Text
-                style={[
-                  styles.modeText,
-                  mode === 'url' && styles.modeTextActive,
-                ]}
-              >
-                URL
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
-      {mode === 'upload' ? (
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-          <Feather name="upload" size={16} color={colors.primary} />
-          <Text style={styles.uploadText}>Elegir imagen (JPG/PNG)</Text>
-        </TouchableOpacity>
-      ) : (
-        <InputField
-          label="URL de la imagen"
-          placeholder="https://ejemplo.com/logo.jpg"
-          value={value.imageURL}
-          onChangeText={handleUrlChange}
-          autoCapitalize="none"
-          keyboardType="url"
-        />
-      )}
+      <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
+        <Feather name="upload" size={16} color={colors.primary} />
+        <Text style={styles.uploadText}>Elegir imagen (JPG/PNG)</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -187,25 +133,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: spacing.sm,
   },
-  modeRow: { flexDirection: 'row', gap: spacing.xs },
-  modeChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-  },
-  modeActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  modeText: {
-    ...typography.caption,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  modeTextActive: { color: colors.textOnPrimary },
   uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',

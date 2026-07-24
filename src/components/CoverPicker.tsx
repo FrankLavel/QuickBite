@@ -1,10 +1,11 @@
 /**
  * CoverPicker.tsx
- * Selector de imagen de portada (banner 16:9): subir imagen o pegar URL.
+ * Selector de imagen de portada (banner 16:9). La imagen se sube a Storage;
+ * `imageURL` conserva la URL ya almacenada al editar.
  * Se guarda en restaurants/{id}.coverImage y se muestra en la app cliente.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -14,7 +15,6 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
-import { InputField } from './InputField';
 import { colors, radius, spacing, typography } from '../utils/theme';
 import { notifyError } from '../utils/notify';
 
@@ -30,10 +30,6 @@ interface CoverPickerProps {
 }
 
 export function CoverPicker({ value, onChange }: CoverPickerProps) {
-  const [mode, setMode] = useState<'upload' | 'url'>(
-    value.imageURL && !value.localUri ? 'url' : 'upload'
-  );
-
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -54,18 +50,7 @@ export function CoverPicker({ value, onChange }: CoverPickerProps) {
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       onChange({ previewUri: uri, imageURL: '', localUri: uri });
-      setMode('upload');
     }
-  };
-
-  const handleUrlChange = (url: string) => {
-    const trimmed = url.trim();
-    onChange({
-      previewUri: trimmed || null,
-      imageURL: trimmed,
-      localUri: undefined,
-    });
-    if (trimmed) setMode('url');
   };
 
   return (
@@ -96,44 +81,10 @@ export function CoverPicker({ value, onChange }: CoverPickerProps) {
         </View>
       </TouchableOpacity>
 
-      <View style={styles.modeRow}>
-        <TouchableOpacity
-          style={[styles.modeChip, mode === 'upload' && styles.modeActive]}
-          onPress={() => setMode('upload')}
-        >
-          <Text
-            style={[styles.modeText, mode === 'upload' && styles.modeTextActive]}
-          >
-            Subir
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeChip, mode === 'url' && styles.modeActive]}
-          onPress={() => setMode('url')}
-        >
-          <Text
-            style={[styles.modeText, mode === 'url' && styles.modeTextActive]}
-          >
-            URL
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {mode === 'upload' ? (
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-          <Feather name="upload" size={16} color={colors.primary} />
-          <Text style={styles.uploadText}>Elegir imagen (JPG/PNG)</Text>
-        </TouchableOpacity>
-      ) : (
-        <InputField
-          label="URL de la portada"
-          placeholder="https://ejemplo.com/portada.jpg"
-          value={value.imageURL}
-          onChangeText={handleUrlChange}
-          autoCapitalize="none"
-          keyboardType="url"
-        />
-      )}
+      <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
+        <Feather name="upload" size={16} color={colors.primary} />
+        <Text style={styles.uploadText}>Elegir imagen (JPG/PNG)</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -179,22 +130,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  modeRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
-  modeChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-  },
-  modeActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeText: {
-    ...typography.caption,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  modeTextActive: { color: colors.textOnPrimary },
   uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
