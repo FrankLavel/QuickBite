@@ -54,13 +54,13 @@ export function UserAvatar({
   );
 }
 
-/** URI preferida: logo del restaurante, luego foto de usuario */
+/** URI preferida: imagen del restaurante (portada), luego foto de usuario. */
 export function getProfileAvatarUri(
-  restaurantLogo?: string,
+  restaurantImage?: string,
   userPhoto?: string
 ): string | null {
-  const logo = restaurantLogo?.trim();
-  if (logo) return logo;
+  const img = restaurantImage?.trim();
+  if (img) return img;
   const photo = userPhoto?.trim();
   if (photo) return photo;
   return null;

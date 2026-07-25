@@ -41,7 +41,7 @@ export function AppHeader({
   const isOpen = restaurant?.isOpen !== false;
 
   const avatarUri = getProfileAvatarUri(
-    restaurant?.logoImage,
+    restaurant?.coverImage,
     user?.photoURL
   );
   const displayName = restaurant?.name ?? user?.name ?? 'R';
@@ -113,7 +113,7 @@ export function AppHeader({
         onClose={() => setMenuOpen(false)}
         userName={user?.name}
         restaurantName={restaurant?.name}
-        logoUri={restaurant?.logoImage}
+        logoUri={restaurant?.coverImage}
         photoUri={user?.photoURL}
         email={user?.email}
         onEditProfile={() => onEditProfile?.()}

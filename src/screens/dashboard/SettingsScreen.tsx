@@ -20,7 +20,6 @@ import { ScreenShell } from '../../components/layout/ScreenShell';
 import { SectionCard } from '../../components/SectionCard';
 import { InputField } from '../../components/InputField';
 import { Button } from '../../components/Button';
-import { AvatarPicker, type AvatarPickerValue } from '../../components/AvatarPicker';
 import { CoverPicker, type CoverPickerValue } from '../../components/CoverPicker';
 import { CuisineSelector } from '../../components/CuisineSelector';
 import { ScheduleEditor } from '../../components/ScheduleEditor';
@@ -29,7 +28,6 @@ import type { WeekSchedule, Restaurant } from '../../types/restaurant';
 import { useAuth } from '../../hooks/useAuth';
 import { colors, radius, shadows, spacing, typography } from '../../utils/theme';
 import { confirmAction } from '../../utils/confirm';
-import { getProfileAvatarUri } from '../../components/UserAvatar';
 import { geocodeAddress } from '../../services/geocode';
 
 type Feedback = { type: 'success' | 'error'; text: string } | null;
@@ -55,10 +53,6 @@ export function SettingsScreen() {
     String(restaurant?.deliveryZone ?? 5)
   );
   const [isOpen, setIsOpen] = useState(restaurant?.isOpen !== false);
-  const [avatar, setAvatar] = useState<AvatarPickerValue>({
-    previewUri: null,
-    imageURL: '',
-  });
   const [cover, setCover] = useState<CoverPickerValue>({
     previewUri: null,
     imageURL: '',
@@ -72,11 +66,6 @@ export function SettingsScreen() {
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
-    const uri = getProfileAvatarUri(restaurant?.logoImage, user?.photoURL);
-    setAvatar({
-      previewUri: uri,
-      imageURL: restaurant?.logoImage ?? user?.photoURL ?? '',
-    });
     setName(user?.name ?? '');
     setPhone(user?.phone ?? '');
     setRestaurantName(restaurant?.name ?? '');
@@ -161,8 +150,6 @@ export function SettingsScreen() {
         { name: name.trim(), phone: phone.trim() },
         restaurantUpdates,
         {
-          localLogoUri: avatar.localUri,
-          logoImageURL: avatar.imageURL,
           localCoverUri: cover.localUri,
           coverImageURL: cover.imageURL,
         }
@@ -280,11 +267,6 @@ export function SettingsScreen() {
               title="Identidad de marca"
               subtitle="Cómo te ven los clientes en la app"
             >
-              <AvatarPicker
-                name={restaurantName || name}
-                value={avatar}
-                onChange={setAvatar}
-              />
               <CoverPicker value={cover} onChange={setCover} />
               <InputField
                 label="Nombre del restaurante"
