@@ -311,6 +311,8 @@ function DeliveryCard({
         ) : null}
       </View>
 
+      <View style={styles.grow} />
+
       {actionLabel ? (
         <Button title={actionLabel} onPress={onAdvance} style={styles.btn} />
       ) : (
@@ -368,14 +370,19 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 340,
     minWidth: 280,
+    // Altura fija para que todas las cards midan igual y la acción quede
+    // alineada abajo (un espaciador empuja el botón al pie de la card).
+    height: 290,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     borderLeftWidth: 4,
     padding: spacing.md,
+    overflow: 'hidden',
     ...shadows.card,
   },
+  grow: { flex: 1 },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',

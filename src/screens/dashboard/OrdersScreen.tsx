@@ -58,9 +58,22 @@ function relTime(v: unknown): string {
 function paymentInfo(o: Order): { text: string; bg: string; fg: string } {
   if (o.paymentStatus === 'paid')
     return { text: 'Pagado', bg: colors.successSoft, fg: colors.success };
+  if (o.paymentStatus === 'refunded')
+    return { text: 'Reembolsado', bg: colors.dangerSoft, fg: colors.danger };
+  if (o.paymentStatus === 'failed')
+    return { text: 'Pago fallido', bg: colors.dangerSoft, fg: colors.danger };
   if (o.paymentMethod === 'cash')
     return { text: 'Efectivo', bg: colors.warningSoft, fg: colors.warning };
   return { text: 'Pago pendiente', bg: colors.surfaceMuted, fg: colors.textSecondary };
+}
+
+/** Etiqueta de la tarjeta usada, p. ej. "Visa ···· 4242". null si no aplica. */
+function cardLabel(o: Order): string | null {
+  if (o.paymentProvider !== 'openpay' || !o.cardLast4) return null;
+  const brand = o.cardBrand
+    ? o.cardBrand.charAt(0).toUpperCase() + o.cardBrand.slice(1)
+    : 'Tarjeta';
+  return `${brand} ···· ${o.cardLast4}`;
 }
 
 const FLOW: OrderStatus[] = [
@@ -356,6 +369,7 @@ function OrderCard({
   onReject: () => void;
 }) {
   const pay = paymentInfo(order);
+  const card = cardLabel(order);
   const isPending = order.status === ORDER_STATUS.PENDING;
   const customer =
     order.customerName ?? `Cliente ${order.customerId.slice(0, 6)}`;
@@ -377,6 +391,12 @@ function OrderCard({
       <Text style={styles.orderTime}>
         Pedido {relTime(order.createdAt) || 'reciente'}
       </Text>
+      {card ? (
+        <View style={styles.cardRow}>
+          <Feather name="credit-card" size={11} color={colors.textSecondary} />
+          <Text style={styles.cardText}>{card}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.customerRow}>
         <UserAvatar name={customer} size={36} />
@@ -397,27 +417,34 @@ function OrderCard({
         </View>
       </View>
 
-      <View style={styles.itemsBox}>
-        {order.items.map((line, idx) => (
-          <View key={`${order.id}-${idx}`}>
-            <Text style={styles.itemLine}>
-              {line.qty}x {line.name}
-            </Text>
-            {line.toppings && line.toppings.length > 0 ? (
-              <Text style={styles.itemToppings}>
-                + {line.toppings.map((t) => t.name).join(', ')}
+      <ScrollView
+        style={styles.orderScroll}
+        contentContainerStyle={styles.orderScrollContent}
+        showsVerticalScrollIndicator
+        nestedScrollEnabled
+      >
+        <View style={styles.itemsBox}>
+          {order.items.map((line, idx) => (
+            <View key={`${order.id}-${idx}`}>
+              <Text style={styles.itemLine}>
+                {line.qty}x {line.name}
               </Text>
-            ) : null}
-            {line.notes ? (
-              <Text style={styles.itemNote}>↳ {line.notes}</Text>
-            ) : null}
-          </View>
-        ))}
-      </View>
+              {line.toppings && line.toppings.length > 0 ? (
+                <Text style={styles.itemToppings}>
+                  + {line.toppings.map((t) => t.name).join(', ')}
+                </Text>
+              ) : null}
+              {line.notes ? (
+                <Text style={styles.itemNote}>↳ {line.notes}</Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
 
-      {order.specialInstructions ? (
-        <Text style={styles.special}>“{order.specialInstructions}”</Text>
-      ) : null}
+        {order.specialInstructions ? (
+          <Text style={styles.special}>“{order.specialInstructions}”</Text>
+        ) : null}
+      </ScrollView>
 
       <View style={styles.orderFooter}>
         {order.estimatedTime ? (
@@ -524,11 +551,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 320,
     minWidth: 280,
+    // Altura fija: todas las cards miden igual y los botones quedan alineados.
+    // El contenido variable (platillos) se desplaza en un scroll interno.
+    height: 380,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
+    overflow: 'hidden',
     ...shadows.card,
   },
   orderCardUrgent: {
@@ -555,6 +586,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   orderTime: { ...typography.caption, color: colors.textMuted },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  cardText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
   customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -568,7 +601,11 @@ const styles = StyleSheet.create({
   customerAddr: { ...typography.caption, color: colors.textSecondary },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   customerPhone: { ...typography.caption, color: colors.primary, fontWeight: '700' },
-  itemsBox: { marginTop: spacing.md, gap: 2 },
+  // Zona desplazable (platillos + instrucciones): ocupa el espacio libre y
+  // hace scroll cuando el pedido tiene muchos productos, sin alargar la card.
+  orderScroll: { flex: 1, marginTop: spacing.sm },
+  orderScrollContent: { paddingRight: 4 },
+  itemsBox: { gap: 2 },
   itemLine: { ...typography.bodySmall, color: colors.text },
   itemToppings: {
     ...typography.caption,
@@ -592,7 +629,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   etaChip: {
     flexDirection: 'row',

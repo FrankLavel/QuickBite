@@ -104,6 +104,14 @@ service cloud.firestore {
         // El cliente puede borrar sus propias notificaciones (limpiar historial).
         allow delete: if isUser(uid);
       }
+
+      // ---------- users/{uid}/cards (tarjetas guardadas) ----------
+      // Solo referencias (marca, últimos 4, card_id de Openpay), NUNCA el PAN.
+      // Las crea/borra Cloud Functions (Admin SDK); el cliente solo lee.
+      match /cards/{cardId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
     }
 
     // ---------- restaurants ----------
@@ -175,7 +183,8 @@ service cloud.firestore {
       // Crear: el customerId debe ser el usuario actual y el estado inicial 'pending'.
       allow create: if isSignedIn()
                     && request.resource.data.customerId == request.auth.uid
-                    && request.resource.data.status == 'pending';
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.paymentStatus == 'pending';
 
       // Cliente: agrega/edita su calificación, o cancela el pedido mientras
       // sigue en 'pending' (status -> 'cancelled', + cancelledAt).
@@ -194,7 +203,7 @@ service cloud.firestore {
                       ||
                       (isRestaurantOwner(resource.data.restaurantId)
                        && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt']))
+                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt']))
                     );
 
       allow delete: if false;

@@ -36,9 +36,24 @@ export function AppHeader({
   onPreferences,
   onLogout,
 }: AppHeaderProps) {
-  const { restaurant, user } = useAuth();
+  const { restaurant, user, updateProfile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const isOpen = restaurant?.isOpen !== false;
+
+  // Cambia abierto/cerrado al instante (un toque). Escribe isOpen en Firestore,
+  // por lo que la app del cliente lo refleja en tiempo real.
+  const toggleOpen = async () => {
+    if (toggling || !restaurant) return;
+    setToggling(true);
+    try {
+      await updateProfile(undefined, { isOpen: !isOpen });
+    } catch {
+      // updateProfile maneja el error; evitamos que truene el toque.
+    } finally {
+      setToggling(false);
+    }
+  };
 
   const avatarUri = getProfileAvatarUri(
     restaurant?.coverImage,
@@ -84,12 +99,23 @@ export function AppHeader({
         <View style={styles.searchSpacer} />
       )}
 
-      <View
-        style={[styles.status, isOpen ? styles.statusOpen : styles.statusClosed]}
+      <Pressable
+        onPress={toggleOpen}
+        disabled={toggling}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isOpen ? 'Cerrar restaurante' : 'Abrir restaurante'
+        }
+        style={({ pressed }) => [
+          styles.status,
+          isOpen ? styles.statusOpen : styles.statusClosed,
+          (pressed || toggling) && styles.statusPressed,
+        ]}
       >
         <View style={[styles.dot, isOpen ? styles.dotOpen : styles.dotClosed]} />
         <Text style={styles.statusText}>{isOpen ? 'Abierto' : 'Cerrado'}</Text>
-      </View>
+        <Feather name="power" size={12} color={colors.textMuted} />
+      </Pressable>
 
       <Pressable
         style={({ pressed }) => [
@@ -177,6 +203,7 @@ const styles = StyleSheet.create({
   },
   statusOpen: { backgroundColor: colors.successSoft },
   statusClosed: { backgroundColor: colors.dangerSoft },
+  statusPressed: { opacity: 0.6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   dotOpen: { backgroundColor: colors.success },
   dotClosed: { backgroundColor: colors.danger },

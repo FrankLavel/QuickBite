@@ -37,6 +37,7 @@ const MAIN_ITEMS: NavItem[] = [
   { key: 'Menu', label: 'Menú', icon: 'book-open' },
   { key: 'Promociones', label: 'Promociones', icon: 'gift' },
   { key: 'Analiticas', label: 'Analíticas', icon: 'bar-chart-2' },
+  { key: 'Liquidaciones', label: 'Liquidaciones', icon: 'dollar-sign' },
   { key: 'Clientes', label: 'Clientes', icon: 'users' },
   { key: 'Notificaciones', label: 'Notificaciones', icon: 'bell' },
 ];

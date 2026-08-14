@@ -12,6 +12,7 @@ import { DeliveriesScreen } from '../screens/dashboard/DeliveriesScreen';
 import { MenuScreen } from '../screens/dashboard/MenuScreen';
 import { PromotionsScreen } from '../screens/dashboard/PromotionsScreen';
 import { AnalyticsScreen } from '../screens/dashboard/AnalyticsScreen';
+import { LiquidacionesScreen } from '../screens/dashboard/LiquidacionesScreen';
 import { CustomersScreen } from '../screens/dashboard/CustomersScreen';
 import { NotificationsScreen } from '../screens/dashboard/NotificationsScreen';
 import { SettingsScreen } from '../screens/dashboard/SettingsScreen';
@@ -31,6 +32,7 @@ export function MainNavigator() {
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Promociones" component={PromotionsScreen} />
       <Stack.Screen name="Analiticas" component={AnalyticsScreen} />
+      <Stack.Screen name="Liquidaciones" component={LiquidacionesScreen} />
       <Stack.Screen name="Clientes" component={CustomersScreen} />
       <Stack.Screen name="Notificaciones" component={NotificationsScreen} />
       <Stack.Screen name="Configuracion" component={SettingsScreen} />

@@ -30,6 +30,15 @@ export const STORAGE_KEYS = {
   REMEMBER_DEVICE: 'quickbite_remember_device',
 } as const;
 
+/**
+ * Comisión de la plataforma sobre los pagos con tarjeta (0.07 = 7%).
+ * QuickBite maneja 7% (vs. ~15% de Uber Eats) para apoyar a restaurantes y
+ * fondas locales de Michoacán. Es el porcentaje que retiene la plataforma; el
+ * resto es el neto a liquidar al restaurante. En la pantalla de Liquidaciones
+ * se puede sobrescribir en vivo para simular escenarios.
+ */
+export const PLATFORM_COMMISSION_RATE = 0.07;
+
 /** Estados de pedido (orders.status) */
 export const ORDER_STATUS = {
   PENDING: 'pending',

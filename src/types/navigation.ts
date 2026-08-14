@@ -19,6 +19,7 @@ export type MainStackParamList = {
   Menu: undefined;
   Promociones: undefined;
   Analiticas: undefined;
+  Liquidaciones: undefined;
   Clientes: undefined;
   Notificaciones: undefined;
   Configuracion: undefined;

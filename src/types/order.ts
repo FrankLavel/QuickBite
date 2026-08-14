@@ -42,7 +42,18 @@ export interface Order {
   total: number;
   deliveryAddress: DeliveryAddress;
   paymentMethod: 'card' | 'paypal' | 'cash';
-  paymentStatus: 'paid' | 'pending' | 'failed';
+  paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded';
+  /** Pasarela usada (solo pagos con tarjeta). Ausente en cash/paypal. */
+  paymentProvider?: 'openpay';
+  /** Id del cargo en Openpay (para conciliar/reembolsar). */
+  openpayChargeId?: string;
+  /** Marca y últimos 4 de la tarjeta, para mostrar en el pedido. */
+  cardBrand?: string | null;
+  cardLast4?: string | null;
+  paidAt?: unknown;
+  refundedAt?: unknown;
+  /** Momento en que la plataforma liquidó (pagó) este pedido al restaurante. */
+  settledAt?: unknown;
   couponCode: string | null;
   specialInstructions?: string;
   estimatedTime?: number;
