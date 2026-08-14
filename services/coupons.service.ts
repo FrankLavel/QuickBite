@@ -33,7 +33,8 @@ export const couponsService = {
    */
   validate: async (
     code: string,
-    subtotal: number
+    subtotal: number,
+    restaurantId?: string
   ): Promise<CouponValidation> => {
     const id = code.trim();
     if (!id) return { valid: false, discount: 0, reason: 'not_found' };
@@ -42,6 +43,12 @@ export const couponsService = {
     if (!snap.exists()) return { valid: false, discount: 0, reason: 'not_found' };
 
     const coupon = { code: snap.id, ...snap.data() } as Coupon;
+
+    // Un cupón solo aplica en el restaurante que lo promociona. Si es de otro,
+    // se trata como inexistente (coincide con la validación del backend).
+    if (restaurantId && coupon.restaurantId !== restaurantId) {
+      return { valid: false, discount: 0, reason: 'not_found' };
+    }
 
     if (!coupon.isActive)
       return { valid: false, discount: 0, reason: 'inactive', coupon };

@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { palette } from '@/constants/colors';
 import { authService } from '@/services/auth.service';
 import { useTranslation } from '@/hooks/useTranslation';
+import { errorCode } from '@/lib/errors';
 
 const cardShadow = {
   shadowColor: '#000',
@@ -68,8 +69,8 @@ export default function SecurityScreen() {
       setCurrent('');
       setNext('');
       setConfirm('');
-    } catch (e: any) {
-      setChangeError(t(authErrorKey(e?.code ?? '')));
+    } catch (e: unknown) {
+      setChangeError(t(authErrorKey(errorCode(e))));
     } finally {
       setChanging(false);
     }
@@ -83,8 +84,8 @@ export default function SecurityScreen() {
       await authService.deleteAccount(hasPassword ? deletePw : undefined);
       setConfirmVisible(false);
       router.replace('/(auth)/login');
-    } catch (e: any) {
-      const code = e?.code ?? e?.message ?? '';
+    } catch (e: unknown) {
+      const code = errorCode(e);
       setDeleteError(code === 'auth/wrong-password' || code === 'auth/invalid-credential'
         ? t('security.wrongCurrent')
         : t('security.deleteError'));

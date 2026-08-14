@@ -28,7 +28,7 @@ export default function ProductScreen() {
   }>();
   const router = useRouter();
   const { product, restaurant, loading } = useProduct(restaurantId, id);
-  const { addItem, removeItem, items } = useCart();
+  const { addItemGuarded, removeItem, items } = useCart();
   const { isFavoriteProduct, toggleFavoriteProduct } = useFavorites();
   const { t } = useTranslation();
 
@@ -98,15 +98,15 @@ export default function ProductScreen() {
     );
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const chosenToppings = (product.toppings ?? [])
       .filter((t) => selected.includes(t.name))
       .map((t) => ({ name: t.name, price: t.price }));
     const trimmedNotes = notes.trim();
-    // En modo edición, quitamos la línea original antes de agregar la actualizada
-    // (así se reemplaza en lugar de crear una línea duplicada en el carrito).
+    // En modo edición se edita una línea del carrito actual (mismo restaurante),
+    // así que no hay conflicto: quitamos la línea original antes de reagregar.
     if (editLineId) removeItem(editLineId);
-    addItem(
+    const added = await addItemGuarded(
       {
         id: cartLineId(product.id, chosenToppings, trimmedNotes),
         productId: product.id,
@@ -119,6 +119,8 @@ export default function ProductScreen() {
       },
       restaurant.id
     );
+    // Si el usuario canceló el cambio de restaurante, no navegamos.
+    if (!added) return;
     if (editLineId) router.back();
     else router.push('/cart');
   };

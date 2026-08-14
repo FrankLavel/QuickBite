@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Image, TextInput, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { View, Text, ScrollView, Image, TextInput, TouchableOpacity, ActivityIndicator, Share, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -12,7 +12,7 @@ import { cartLineId } from '@/store/cartStore';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cuisineLabel } from '@/lib/i18n';
-import { isOpenNow, todayHoursLabel } from '@/lib/schedule';
+import { isRestaurantOpen, todayHoursLabel } from '@/lib/schedule';
 import { Product } from '@/types/product.types';
 
 const cardShadow = {
@@ -26,7 +26,7 @@ export default function RestaurantScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { restaurant, categories, products, loading } = useRestaurant(id);
-  const { addItem, itemCount, total } = useCart();
+  const { addItemGuarded, itemCount, total } = useCart();
   const { isFavorite, toggleFavorite, isFavoriteProduct, toggleFavoriteProduct } = useFavorites();
   const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function RestaurantScreen() {
     );
   }
 
-  const open = restaurant.isOpen && isOpenNow(restaurant.schedule);
+  const open = isRestaurantOpen(restaurant);
   const favorite = isFavorite(restaurant.id);
 
   const query = search.trim().toLowerCase();
@@ -67,8 +67,13 @@ export default function RestaurantScreen() {
     : products.filter((p) => p.categoryId === selectedCategory);
   const [featured, ...rest] = visibleProducts;
 
-  const add = (product: Product) =>
-    addItem(
+  const add = (product: Product) => {
+    // Si el restaurante está cerrado, no se puede pedir.
+    if (!open) {
+      Alert.alert(t('restaurant.closedTitle'), t('restaurant.closedMsg'));
+      return;
+    }
+    void addItemGuarded(
       {
         id: cartLineId(product.id),
         productId: product.id,
@@ -79,6 +84,7 @@ export default function RestaurantScreen() {
       },
       restaurant.id
     );
+  };
 
   const goToProduct = (product: Product) =>
     router.push(`/product/${product.id}?restaurantId=${restaurant.id}`);
@@ -228,6 +234,19 @@ export default function RestaurantScreen() {
             <Text className="text-on-surface-variant text-xs text-center">{t('restaurant.fee')}</Text>
           </View>
         </View>
+
+        {/* Aviso de restaurante cerrado (no se puede pedir) */}
+        {!open && (
+          <View className="mx-4 mt-3 flex-row items-center gap-3 bg-error/10 border border-error/30 rounded-xl p-4">
+            <Icon name="lock" color={palette.error} size={22} />
+            <View className="flex-1">
+              <Text className="text-error font-bold text-sm">{t('restaurant.closedTitle')}</Text>
+              <Text className="text-on-surface-variant text-xs mt-0.5">
+                {t('restaurant.closedMsg')}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Horario / pedido mínimo / dirección */}
         <View className="mx-4 mt-3 gap-1">

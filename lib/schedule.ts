@@ -52,3 +52,18 @@ export function todayHoursLabel(schedule?: WeekSchedule): string {
   const today = getTodayHours(schedule);
   return today ? `${today.open} - ${today.close}` : 'Cerrado hoy';
 }
+
+/**
+ * ¿El restaurante está abierto para pedir? El interruptor manual `isOpen` manda:
+ * si el restaurante se marcó como cerrado, está cerrado. Si está marcado abierto,
+ * se respeta el horario SOLO si tiene uno configurado (si no hay horario, se
+ * considera abierto para no penalizar a quien no lo llenó).
+ */
+export function isRestaurantOpen(r?: {
+  isOpen?: boolean;
+  schedule?: WeekSchedule;
+}): boolean {
+  if (!r || r.isOpen === false) return false;
+  const hasSchedule = !!r.schedule && Object.keys(r.schedule).length > 0;
+  return hasSchedule ? isOpenNow(r.schedule) : true;
+}

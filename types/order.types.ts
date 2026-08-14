@@ -12,7 +12,9 @@ export type OrderStatus =
 
 export type PaymentMethod = 'card' | 'paypal' | 'cash';
 
-export type PaymentStatus = 'paid' | 'pending' | 'failed';
+export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
+
+export type PaymentProvider = 'openpay';
 
 /** Topping ya elegido dentro de un ítem del pedido. */
 export interface OrderItemTopping {
@@ -60,6 +62,19 @@ export interface Order {
   deliveryAddress: OrderDeliveryAddress;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Pasarela usada (solo pagos con tarjeta). Ausente en cash/paypal. */
+  paymentProvider?: PaymentProvider;
+  /** Id del cargo en Openpay (para conciliar/reembolsar). */
+  openpayChargeId?: string;
+  /** Marca y últimos 4 de la tarjeta, para mostrar en el recibo/dashboard. */
+  cardBrand?: string | null;
+  cardLast4?: string | null;
+  /** Momento del cobro exitoso. */
+  paidAt?: Timestamp;
+  /** Momento del reembolso (si aplica). */
+  refundedAt?: Timestamp;
+  /** Momento en que la plataforma liquidó este pedido al restaurante. */
+  settledAt?: Timestamp;
   /** Código del cupón aplicado. null si no se usó. */
   couponCode: string | null;
   specialInstructions?: string;

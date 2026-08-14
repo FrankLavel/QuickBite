@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,15 +8,27 @@ import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { restaurantsService } from '@/services/restaurants.service';
 import { ordersService } from '@/services/orders.service';
+import {
+  paymentsService,
+  OpenpayToken,
+  CardChargePayload,
+  newOrderId,
+} from '@/services/payments.service';
 import { couponDiscount } from '@/services/coupons.service';
+import { isRestaurantOpen } from '@/lib/schedule';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSavedCards } from '@/hooks/useSavedCards';
 import { DeliveryAddressSheet } from '@/components/address/DeliveryAddressSheet';
+import { OpenpayCardSheet } from '@/components/payment/OpenpayCardSheet';
+import { SavedCardPicker } from '@/components/payment/SavedCardPicker';
+import { OpenpayDeviceSession } from '@/components/payment/OpenpayDeviceSession';
 import { Restaurant } from '@/types/restaurant.types';
 import { NewOrderInput, OrderItem, PaymentMethod } from '@/types/order.types';
 
+// PayPal se oculta por ahora: no hay integración real (elegirlo crearía un
+// pedido "pendiente" sin cobro). Se ofrecen solo Tarjeta (Openpay) y Efectivo.
 const PAYMENT_METHODS: { id: PaymentMethod; icon: IconName }[] = [
   { id: 'card', icon: 'credit-card' },
-  { id: 'paypal', icon: 'account-balance-wallet' },
   { id: 'cash', icon: 'payments' },
 ];
 
@@ -42,6 +54,15 @@ export default function CheckoutScreen() {
   const [instructions, setInstructions] = useState('');
   const [placing, setPlacing] = useState(false);
   const [addressSheetVisible, setAddressSheetVisible] = useState(false);
+  const [cardSheetVisible, setCardSheetVisible] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  // Cuando != null, se monta el WebView headless para generar el device_session
+  // y cobrar esa tarjeta guardada (pago de un toque).
+  const [savedPayCardId, setSavedPayCardId] = useState<string | null>(null);
+  const { cards } = useSavedCards();
+  // Id de pedido estable para el pago con tarjeta: se conserva entre reintentos
+  // del mismo checkout (idempotencia anti-doble-cobro) y se reinicia al concretar.
+  const cardOrderId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -59,13 +80,9 @@ export default function CheckoutScreen() {
   const addNote = (text: string) =>
     setInstructions((prev) => (prev ? `${prev}, ${text}` : text));
 
-  const confirmOrder = async () => {
-    if (placing) return;
-    if (!user || !restaurantId) return;
-    if (!defaultAddress) {
-      Alert.alert(t('checkout.addressAlertTitle'), t('checkout.addressAlertMsg'));
-      return;
-    }
+  /** Arma el NewOrderInput con el estado actual del checkout. */
+  const buildOrderInput = (): NewOrderInput | null => {
+    if (!user || !restaurantId || !defaultAddress) return null;
 
     const orderItems: OrderItem[] = items.map((i) => ({
       productId: i.productId,
@@ -78,7 +95,7 @@ export default function CheckoutScreen() {
       ...(i.notes ? { notes: i.notes } : {}),
     }));
 
-    const input: NewOrderInput = {
+    return {
       customerId: user.uid,
       // Nombre y teléfono denormalizados para que el restaurante los vea/contacte.
       ...(user.name?.trim() ? { customerName: user.name.trim() } : {}),
@@ -100,6 +117,37 @@ export default function CheckoutScreen() {
       couponCode: coupon && discount > 0 ? coupon.code : null,
       ...(instructions.trim() ? { specialInstructions: instructions.trim() } : {}),
     };
+  };
+
+  const confirmOrder = async () => {
+    if (placing) return;
+    if (!user || !restaurantId) return;
+    if (!defaultAddress) {
+      Alert.alert(t('checkout.addressAlertTitle'), t('checkout.addressAlertMsg'));
+      return;
+    }
+    // El restaurante debe estar abierto para completar el pedido.
+    if (restaurant && !isRestaurantOpen(restaurant)) {
+      Alert.alert(t('checkout.closedTitle'), t('checkout.closedMsg'));
+      return;
+    }
+
+    // Pago con tarjeta: se cobra vía Openpay (WebView + Cloud Function). El
+    // pedido lo crea el backend solo si el cargo es exitoso.
+    if (payment === 'card') {
+      // Genera el id una sola vez por checkout; los reintentos reusan el mismo
+      // para que el backend no cobre dos veces.
+      if (!cardOrderId.current) cardOrderId.current = newOrderId();
+      // Si el usuario tiene tarjetas guardadas, ofrece elegir (pago de un toque);
+      // si no, va directo a capturar una tarjeta nueva.
+      if (cards.length > 0) setPickerVisible(true);
+      else setCardSheetVisible(true);
+      return;
+    }
+
+    // Efectivo / PayPal: se crea el pedido directamente (paymentStatus 'pending').
+    const input = buildOrderInput();
+    if (!input) return;
 
     setPlacing(true);
     try {
@@ -110,6 +158,60 @@ export default function CheckoutScreen() {
       setPlacing(false);
       Alert.alert(t('common.error'), t('checkout.errorMsg'));
     }
+  };
+
+  /** Cobra con tarjeta (nueva o guardada) vía el backend. */
+  const chargeCard = async (payload: CardChargePayload) => {
+    const input = buildOrderInput();
+    if (!input) {
+      setPlacing(false);
+      return;
+    }
+    if (!cardOrderId.current) cardOrderId.current = newOrderId();
+    const orderId = cardOrderId.current;
+
+    setPlacing(true);
+    try {
+      const createdId = await paymentsService.createCardOrder(input, orderId, payload);
+      cardOrderId.current = null; // éxito: el próximo pedido usa un id nuevo.
+      clearCart();
+      router.replace(`/confirmation?orderId=${createdId}`);
+    } catch (e) {
+      setPlacing(false);
+      const message =
+        e instanceof Error && e.message ? e.message : t('checkout.errorMsg');
+      Alert.alert(t('checkout.paymentErrorTitle'), message);
+    }
+  };
+
+  /** Tarjeta NUEVA tokenizada (con opción de guardarla). */
+  const onCardToken = (token: OpenpayToken, saveCard: boolean) => {
+    setCardSheetVisible(false);
+    chargeCard({
+      tokenId: token.tokenId,
+      deviceSessionId: token.deviceSessionId,
+      saveCard,
+    });
+  };
+
+  /** Eligió una tarjeta guardada: monta el WebView para el device_session. */
+  const onSelectSavedCard = (cardId: string) => {
+    setPickerVisible(false);
+    setPlacing(true);
+    setSavedPayCardId(cardId);
+  };
+
+  /** device_session listo → cobra la tarjeta guardada (un toque). */
+  const onDeviceReady = (deviceSessionId: string) => {
+    const cardId = savedPayCardId;
+    setSavedPayCardId(null);
+    if (cardId) chargeCard({ savedCardId: cardId, deviceSessionId });
+  };
+
+  const onDeviceError = (message: string) => {
+    setSavedPayCardId(null);
+    setPlacing(false);
+    Alert.alert(t('checkout.paymentErrorTitle'), message);
   };
 
   if (items.length === 0 && !placing) {
@@ -353,6 +455,31 @@ export default function CheckoutScreen() {
         visible={addressSheetVisible}
         onClose={() => setAddressSheetVisible(false)}
       />
+
+      <SavedCardPicker
+        visible={pickerVisible}
+        cards={cards}
+        amountLabel={`$${total.toFixed(2)}`}
+        onSelect={onSelectSavedCard}
+        onNewCard={() => {
+          setPickerVisible(false);
+          setCardSheetVisible(true);
+        }}
+        onClose={() => setPickerVisible(false)}
+      />
+
+      <OpenpayCardSheet
+        visible={cardSheetVisible}
+        amountLabel={`$${total.toFixed(2)}`}
+        showSaveToggle
+        onClose={() => setCardSheetVisible(false)}
+        onToken={onCardToken}
+      />
+
+      {/* WebView headless para el device_session de una tarjeta guardada. */}
+      {savedPayCardId && (
+        <OpenpayDeviceSession onReady={onDeviceReady} onError={onDeviceError} />
+      )}
     </SafeAreaView>
   );
 }

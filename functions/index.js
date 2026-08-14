@@ -3,11 +3,29 @@ const {
   onDocumentCreated,
   onDocumentWritten,
 } = require('firebase-functions/v2/firestore');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { defineString, defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const openpay = require('./openpay');
 
 initializeApp();
 const db = getFirestore();
+
+// --- Configuración Openpay ---------------------------------------------------
+// No sensibles (el merchant id también vive en el cliente para tokenizar):
+const OPENPAY_MERCHANT_ID = defineString('OPENPAY_MERCHANT_ID');
+const OPENPAY_SANDBOX = defineString('OPENPAY_SANDBOX', { default: 'true' });
+// Sensibles (Secret Manager): `firebase functions:secrets:set OPENPAY_PRIVATE_KEY`
+const OPENPAY_PRIVATE_KEY = defineSecret('OPENPAY_PRIVATE_KEY');
+const OPENPAY_WEBHOOK_USER = defineSecret('OPENPAY_WEBHOOK_USER');
+const OPENPAY_WEBHOOK_PASS = defineSecret('OPENPAY_WEBHOOK_PASS');
+
+const openpayCfg = () => ({
+  merchantId: OPENPAY_MERCHANT_ID.value(),
+  privateKey: OPENPAY_PRIVATE_KEY.value(),
+  sandbox: OPENPAY_SANDBOX.value() !== 'false',
+});
 
 // Mensaje al cliente por cada estado (debe coincidir con lib/orderStatus.ts).
 const STATUS_MESSAGE = {
@@ -234,5 +252,578 @@ exports.onReviewWritten = onDocumentWritten(
         { rating: Math.round(restAvg * 10) / 10, reviewCount: restCount },
         { merge: true }
       );
+  }
+);
+
+// ============================================================================
+//                              PAGOS — OPENPAY
+// ============================================================================
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * Recalcula los montos del pedido EN EL SERVIDOR a partir de los items, el
+ * deliveryFee del restaurante y el cupón (Firestore). Nunca se confía en el
+ * `total` que manda el cliente (evita manipulación del importe a cobrar).
+ * Devuelve { subtotal, deliveryFee, discount, total, couponCode }.
+ */
+async function computeOrderTotals(input) {
+  const items = Array.isArray(input.items) ? input.items : [];
+  if (items.length === 0) {
+    throw new HttpsError('invalid-argument', 'El pedido no tiene productos.');
+  }
+
+  let subtotal = 0;
+  for (const it of items) {
+    const price = Number(it.price);
+    const qty = Number(it.qty);
+    if (!(price >= 0) || !(qty > 0)) {
+      throw new HttpsError('invalid-argument', 'Producto con precio/cantidad inválidos.');
+    }
+    subtotal += round2(price * qty);
+  }
+  subtotal = round2(subtotal);
+
+  // deliveryFee real del restaurante.
+  const restSnap = await db.collection('restaurants').doc(input.restaurantId).get();
+  if (!restSnap.exists) {
+    throw new HttpsError('not-found', 'Restaurante no encontrado.');
+  }
+  const deliveryFee = Number(restSnap.get('deliveryFee')) || 0;
+
+  // Descuento por cupón (revalidado contra Firestore).
+  let discount = 0;
+  let couponCode = null;
+  if (input.couponCode) {
+    const cSnap = await db.collection('coupons').doc(input.couponCode).get();
+    if (cSnap.exists) {
+      const c = cSnap.data();
+      const notExpired = !c.expiresAt || c.expiresAt.toMillis() > Date.now();
+      const usable =
+        c.restaurantId === input.restaurantId &&
+        c.isActive &&
+        notExpired &&
+        c.usedCount < c.maxUses &&
+        subtotal >= c.minOrder;
+      if (usable) {
+        const raw = c.type === 'percent' ? (subtotal * c.value) / 100 : c.value;
+        discount = round2(Math.min(raw, subtotal));
+        couponCode = cSnap.id;
+      }
+    }
+  }
+
+  const total = Math.max(0, round2(subtotal + deliveryFee - discount));
+  return { subtotal, deliveryFee, discount, total, couponCode };
+}
+
+/** Mapea un error de Openpay a un HttpsError con mensaje amigable en español. */
+function openpayError(e) {
+  const op = e && e.openpay;
+  // Códigos de tarjeta declinada / fondos: 3001-3005, etc.
+  const msgByCode = {
+    3001: 'La tarjeta fue declinada.',
+    3002: 'La tarjeta ha expirado.',
+    3003: 'Fondos insuficientes.',
+    3004: 'La tarjeta fue reportada como robada.',
+    3005: 'La tarjeta fue rechazada por el sistema antifraude.',
+    3009: 'La tarjeta fue reportada como perdida.',
+    3010: 'El banco restringió la tarjeta.',
+  };
+  const friendly =
+    (op && (msgByCode[op.error_code] || op.description)) ||
+    'No se pudo procesar el pago. Intenta con otra tarjeta.';
+  return new HttpsError('aborted', friendly, {
+    error_code: op && op.error_code,
+    category: op && op.category,
+  });
+}
+
+/** Lee el customerId de Openpay guardado en users/{uid} (o null). */
+async function getOpenpayCustomerId(uid) {
+  const snap = await db.collection('users').doc(uid).get();
+  return snap.get('openpayCustomerId') || null;
+}
+
+/** Obtiene (o crea) el cliente Openpay del usuario y lo guarda en users/{uid}. */
+async function getOrCreateOpenpayCustomer(uid, name, email) {
+  const existing = await getOpenpayCustomerId(uid);
+  if (existing) return existing;
+  const customer = await openpay.createCustomer(openpayCfg(), {
+    name: name || 'Cliente QuickBite',
+    // Openpay exige email con formato válido; si el usuario no tiene, uno estable.
+    email: email || `qb-${uid}@quickbite.mx`,
+  });
+  await db.collection('users').doc(uid).set(
+    { openpayCustomerId: customer.id },
+    { merge: true }
+  );
+  return customer.id;
+}
+
+/** Guarda los metadatos (no el PAN) de una tarjeta en users/{uid}/cards/{cardId}. */
+async function writeSavedCard(uid, card) {
+  const cardsCol = db.collection('users').doc(uid).collection('cards');
+  const first = await cardsCol.limit(1).get();
+  const num = card.card_number || '';
+  await cardsCol.doc(card.id).set({
+    openpayCardId: card.id,
+    brand: card.brand || null,
+    cardLast4: num ? num.slice(-4) : null,
+    expMonth: card.expiration_month || null,
+    expYear: card.expiration_year || null,
+    holderName: card.holder_name || null,
+    isDefault: first.empty, // la primera tarjeta queda como predeterminada
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
+
+/**
+ * createCardCharge — Callable. Cobra con tarjeta vía Openpay y, SOLO si el
+ * cargo es exitoso, crea el pedido (paymentStatus:'paid') e incrementa el
+ * cupón, todo con el Admin SDK (salta las Security Rules).
+ *
+ * data: { orderInput: NewOrderInput, tokenId, deviceSessionId }
+ * return: { orderId, chargeId }
+ */
+exports.createCardCharge = onCall(
+  {
+    region: 'us-central1',
+    secrets: [OPENPAY_PRIVATE_KEY],
+  },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Inicia sesión para pagar.');
+    }
+
+    const {
+      orderInput,
+      tokenId,
+      deviceSessionId,
+      orderId: clientOrderId,
+      savedCardId,
+      saveCard,
+    } = request.data || {};
+    if (!orderInput || !deviceSessionId) {
+      throw new HttpsError('invalid-argument', 'Faltan datos del pago.');
+    }
+    if (!tokenId && !savedCardId) {
+      throw new HttpsError('invalid-argument', 'Falta la tarjeta.');
+    }
+    if (!orderInput.restaurantId) {
+      throw new HttpsError('invalid-argument', 'Falta el restaurante.');
+    }
+
+    // 1) Id del pedido: usamos el que manda el cliente (estable entre reintentos
+    //    del mismo checkout) para ser idempotentes; si no viene, generamos uno.
+    //    También es el order_id en Openpay.
+    const orderRef = clientOrderId
+      ? db.collection('orders').doc(String(clientOrderId))
+      : db.collection('orders').doc();
+    const orderId = orderRef.id;
+
+    // Idempotencia anti-doble-cobro: si ese pedido ya existe y está pagado (un
+    // intento previo sí concretó pero la respuesta no llegó al cliente), lo
+    // devolvemos sin volver a cobrar.
+    const existing = await orderRef.get();
+    if (existing.exists) {
+      if (existing.get('customerId') !== uid) {
+        throw new HttpsError('invalid-argument', 'Identificador de pedido inválido.');
+      }
+      if (existing.get('paymentStatus') === 'paid') {
+        return { orderId, chargeId: existing.get('openpayChargeId') || null };
+      }
+      throw new HttpsError('aborted', 'Este pedido ya está en proceso. Revisa tus pedidos.');
+    }
+
+    // 2) Montos recalculados en el servidor (fuente de verdad del cobro).
+    const totals = await computeOrderTotals(orderInput);
+    if (totals.total <= 0) {
+      throw new HttpsError('failed-precondition', 'El total a cobrar es inválido.');
+    }
+
+    // 3) Cargo en Openpay. Tres modos:
+    //    a) savedCardId  -> cobra una tarjeta ya guardada del cliente.
+    //    b) tokenId+save -> guarda la tarjeta en el cliente y cobra esa tarjeta.
+    //    c) tokenId      -> cargo de un solo uso a nivel comercio (no se guarda).
+    const desc = `QuickBite pedido ${orderId}`;
+    let charge;
+    let newCardMeta = null;
+    try {
+      if (savedCardId) {
+        const customerId = await getOpenpayCustomerId(uid);
+        if (!customerId) {
+          throw new HttpsError('failed-precondition', 'No tienes tarjetas guardadas.');
+        }
+        charge = await openpay.chargeCustomerCard(openpayCfg(), customerId, {
+          amount: totals.total,
+          cardId: savedCardId,
+          deviceSessionId,
+          orderId,
+          description: desc,
+        });
+      } else if (saveCard) {
+        // El token es de un solo uso: se crea la tarjeta en el cliente y se
+        // cobra esa tarjeta (así queda guardada para la próxima compra).
+        const customerId = await getOrCreateOpenpayCustomer(
+          uid,
+          orderInput.customerName,
+          request.auth.token.email
+        );
+        newCardMeta = await openpay.createCustomerCard(openpayCfg(), customerId, {
+          tokenId,
+          deviceSessionId,
+        });
+        charge = await openpay.chargeCustomerCard(openpayCfg(), customerId, {
+          amount: totals.total,
+          cardId: newCardMeta.id,
+          deviceSessionId,
+          orderId,
+          description: desc,
+        });
+      } else {
+        charge = await openpay.createCardCharge(openpayCfg(), {
+          amount: totals.total,
+          currency: 'MXN',
+          tokenId,
+          deviceSessionId,
+          orderId,
+          description: desc,
+          customer: {
+            name: orderInput.customerName || 'Cliente QuickBite',
+            email: request.auth.token.email || 'sin-correo@quickbite.mx',
+          },
+        });
+      }
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      console.error('Openpay charge falló', e.openpay || e.message);
+      throw openpayError(e);
+    }
+
+    // Openpay: 'completed' = cobrado; otro estado no lo damos por pagado.
+    if (charge.status !== 'completed') {
+      console.warn('Cargo Openpay no completado', charge.id, charge.status);
+      throw new HttpsError('aborted', 'El pago no se completó. Intenta de nuevo.');
+    }
+
+    // 4) Crear el pedido pagado + incrementar cupón (batch atómico).
+    const cardNumber = (charge.card && charge.card.card_number) || '';
+    const orderDoc = {
+      customerId: uid, // desde auth, nunca del cliente
+      restaurantId: orderInput.restaurantId,
+      items: orderInput.items,
+      subtotal: totals.subtotal,
+      deliveryFee: totals.deliveryFee,
+      discount: totals.discount,
+      total: totals.total,
+      deliveryAddress: orderInput.deliveryAddress,
+      paymentMethod: 'card',
+      paymentStatus: 'paid',
+      paymentProvider: 'openpay',
+      openpayChargeId: charge.id,
+      cardBrand: (charge.card && charge.card.brand) || null,
+      cardLast4: cardNumber ? cardNumber.slice(-4) : null,
+      couponCode: totals.couponCode,
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+      paidAt: FieldValue.serverTimestamp(),
+      ...(orderInput.customerName ? { customerName: orderInput.customerName } : {}),
+      ...(orderInput.customerPhone ? { customerPhone: orderInput.customerPhone } : {}),
+      ...(orderInput.specialInstructions
+        ? { specialInstructions: orderInput.specialInstructions }
+        : {}),
+    };
+
+    try {
+      const batch = db.batch();
+      batch.set(orderRef, orderDoc);
+      if (totals.couponCode) {
+        batch.update(db.collection('coupons').doc(totals.couponCode), {
+          usedCount: FieldValue.increment(1),
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      // Se cobró pero no se pudo guardar el pedido: reversamos para no dejar
+      // un cargo huérfano y devolvemos error.
+      console.error('Fallo al guardar el pedido tras cobrar; reversando', e);
+      try {
+        await openpay.refundCharge(openpayCfg(), charge.id, 'Reverso: pedido no guardado');
+      } catch (re) {
+        console.error('Reverso Openpay falló (revisar manualmente)', charge.id, re);
+      }
+      throw new HttpsError('internal', 'No se pudo registrar el pedido. Se revirtió el cobro.');
+    }
+
+    // Si se guardó una tarjeta nueva durante el pago, registra sus metadatos
+    // (best-effort; la tarjeta ya quedó en la bóveda de Openpay).
+    if (newCardMeta) {
+      try {
+        await writeSavedCard(uid, newCardMeta);
+      } catch (e) {
+        console.error('No se guardó la metadata de la tarjeta', e);
+      }
+    }
+
+    return { orderId, chargeId: charge.id };
+  }
+);
+
+/**
+ * saveCard — guarda una tarjeta (desde un token de Openpay.js) en el cliente
+ * Openpay del usuario, sin cobrar. Devuelve marca + últimos 4 para mostrar.
+ * data: { tokenId, deviceSessionId } -> { cardId, brand, last4 }
+ */
+exports.saveCard = onCall(
+  { region: 'us-central1', secrets: [OPENPAY_PRIVATE_KEY] },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Inicia sesión.');
+    const { tokenId, deviceSessionId } = request.data || {};
+    if (!tokenId || !deviceSessionId) {
+      throw new HttpsError('invalid-argument', 'Faltan datos de la tarjeta.');
+    }
+
+    const customerId = await getOrCreateOpenpayCustomer(
+      uid,
+      request.auth.token.name,
+      request.auth.token.email
+    );
+
+    let card;
+    try {
+      card = await openpay.createCustomerCard(openpayCfg(), customerId, {
+        tokenId,
+        deviceSessionId,
+      });
+    } catch (e) {
+      console.error('Guardar tarjeta falló', e.openpay || e.message);
+      throw openpayError(e);
+    }
+
+    await writeSavedCard(uid, card);
+    const num = card.card_number || '';
+    return {
+      cardId: card.id,
+      brand: card.brand || null,
+      last4: num ? num.slice(-4) : null,
+    };
+  }
+);
+
+/**
+ * deleteCard — elimina una tarjeta guardada (Openpay + Firestore).
+ * data: { cardId } -> { ok: true }
+ */
+exports.deleteCard = onCall(
+  { region: 'us-central1', secrets: [OPENPAY_PRIVATE_KEY] },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Inicia sesión.');
+    const { cardId } = request.data || {};
+    if (!cardId) throw new HttpsError('invalid-argument', 'Falta la tarjeta.');
+
+    const cardRef = db
+      .collection('users')
+      .doc(uid)
+      .collection('cards')
+      .doc(cardId);
+    const cardSnap = await cardRef.get();
+    if (!cardSnap.exists) {
+      throw new HttpsError('not-found', 'Tarjeta no encontrada.');
+    }
+
+    const customerId = await getOpenpayCustomerId(uid);
+    if (customerId) {
+      try {
+        await openpay.deleteCustomerCard(openpayCfg(), customerId, cardId);
+      } catch (e) {
+        // Si ya no existe en Openpay, seguimos borrando el registro local.
+        console.warn('Delete card Openpay', e.openpay || e.message);
+      }
+    }
+
+    const wasDefault = cardSnap.get('isDefault');
+    await cardRef.delete();
+
+    // Si era la predeterminada, marca otra como predeterminada.
+    if (wasDefault) {
+      const rest = await db
+        .collection('users')
+        .doc(uid)
+        .collection('cards')
+        .limit(1)
+        .get();
+      if (!rest.empty) {
+        await rest.docs[0].ref.set({ isDefault: true }, { merge: true });
+      }
+    }
+
+    return { ok: true };
+  }
+);
+
+/**
+ * openpayWebhook — recibe eventos de Openpay (charge.succeeded / .failed /
+ * .refunded, y la verificación inicial) y reconcilia paymentStatus del pedido
+ * de forma idempotente. Se autentica con Basic auth (usuario/clave del webhook
+ * configurados en el panel de Openpay).
+ */
+exports.openpayWebhook = onRequest(
+  {
+    region: 'us-central1',
+    secrets: [OPENPAY_WEBHOOK_USER, OPENPAY_WEBHOOK_PASS],
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    // Basic auth del webhook.
+    const header = req.headers.authorization || '';
+    const expected =
+      'Basic ' +
+      Buffer.from(
+        `${OPENPAY_WEBHOOK_USER.value()}:${OPENPAY_WEBHOOK_PASS.value()}`
+      ).toString('base64');
+    if (header !== expected) {
+      res.status(401).send('Unauthorized');
+      return;
+    }
+
+    const body = req.body || {};
+
+    // Openpay envía un evento 'verification' al registrar el webhook.
+    if (body.type === 'verification') {
+      console.log('Openpay webhook verification', body.verification_code);
+      res.status(200).json({ verification_code: body.verification_code });
+      return;
+    }
+
+    const tx = body.transaction || {};
+    const chargeId = tx.id;
+    const orderId = tx.order_id;
+    if (!chargeId && !orderId) {
+      res.status(200).send('ignored');
+      return;
+    }
+
+    // Mapea el tipo de evento (nombres oficiales de Openpay) a paymentStatus.
+    const statusByType = {
+      'charge.succeeded': 'paid',
+      'charge.failed': 'failed',
+      'charge.cancelled': 'failed',
+      'charge.refunded': 'refunded',
+      'chargeback.accepted': 'refunded',
+    };
+    const newStatus = statusByType[body.type];
+    if (!newStatus) {
+      res.status(200).send('ignored');
+      return;
+    }
+
+    // Localiza el pedido: por order_id (nuestro id) o por openpayChargeId.
+    let ref = null;
+    if (orderId) {
+      const snap = await db.collection('orders').doc(orderId).get();
+      if (snap.exists) ref = snap.ref;
+    }
+    if (!ref && chargeId) {
+      const q = await db
+        .collection('orders')
+        .where('openpayChargeId', '==', chargeId)
+        .limit(1)
+        .get();
+      if (!q.empty) ref = q.docs[0].ref;
+    }
+
+    if (!ref) {
+      console.warn('Webhook Openpay sin pedido asociado', { chargeId, orderId, type: body.type });
+      res.status(200).send('no-order');
+      return;
+    }
+
+    // Idempotente: solo escribe si cambia el estado.
+    const cur = (await ref.get()).get('paymentStatus');
+    if (cur !== newStatus) {
+      await ref.set(
+        {
+          paymentStatus: newStatus,
+          ...(chargeId ? { openpayChargeId: chargeId } : {}),
+          ...(newStatus === 'refunded' ? { refundedAt: FieldValue.serverTimestamp() } : {}),
+        },
+        { merge: true }
+      );
+    }
+
+    res.status(200).send('ok');
+  }
+);
+
+/**
+ * refundOnCancel — cuando un pedido pagado con tarjeta (Openpay) pasa a
+ * 'rejected' (lo rechaza el restaurante) o 'cancelled' (lo cancela el cliente),
+ * reembolsa el cargo automáticamente y marca el pedido como 'refunded'. Así el
+ * cliente nunca se queda cobrado por un pedido que no se va a preparar.
+ */
+exports.refundOnCancel = onDocumentUpdated(
+  { document: 'orders/{orderId}', secrets: [OPENPAY_PRIVATE_KEY] },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+
+    // Solo al MOMENTO de pasar a rechazado/cancelado (evita re-disparos).
+    const nowVoided = after.status === 'rejected' || after.status === 'cancelled';
+    const statusChanged = before.status !== after.status;
+    if (!nowVoided || !statusChanged) return;
+
+    // Solo pagos con tarjeta Openpay ya cobrados y no reembolsados.
+    if (after.paymentProvider !== 'openpay') return;
+    if (after.paymentStatus !== 'paid') return;
+    if (!after.openpayChargeId) return;
+
+    try {
+      await openpay.refundCharge(
+        openpayCfg(),
+        after.openpayChargeId,
+        `Pedido ${after.status} — reembolso automático`
+      );
+    } catch (e) {
+      // Si el reembolso falla, NO marcamos refunded: queda para reintento/revisión
+      // manual (el pedido sigue 'paid' y saldrá en logs).
+      console.error(
+        'Reembolso Openpay falló',
+        after.openpayChargeId,
+        e.openpay || e.message
+      );
+      return;
+    }
+
+    await event.data.after.ref.set(
+      { paymentStatus: 'refunded', refundedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+
+    // Avisa al cliente que se le reembolsó el pago (notificación en tiempo real).
+    if (after.customerId) {
+      await db
+        .collection('users')
+        .doc(after.customerId)
+        .collection('notifications')
+        .add({
+          type: 'order_update',
+          title: 'Pago reembolsado',
+          body: `Se reembolsó tu pago de $${Number(after.total || 0).toFixed(2)}. Puede tardar unos días en reflejarse en tu tarjeta.`,
+          orderId: event.params.orderId,
+          isRead: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+    }
+
+    console.log('Pedido reembolsado', event.params.orderId, after.openpayChargeId);
   }
 );

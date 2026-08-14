@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon, IconName } from '@/components/ui/Icon';
@@ -9,6 +9,7 @@ import { useOrders } from '@/hooks/useOrders';
 import { useTranslation } from '@/hooks/useTranslation';
 import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { DeliveryAddressSheet } from '@/components/address/DeliveryAddressSheet';
+import { PaymentMethodsSheet } from '@/components/payment/PaymentMethodsSheet';
 
 const cardShadow = {
   shadowColor: '#000',
@@ -24,11 +25,12 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const [editVisible, setEditVisible] = useState(false);
   const [addressVisible, setAddressVisible] = useState(false);
+  const [paymentVisible, setPaymentVisible] = useState(false);
 
   const accountItems: { label: string; icon: IconName; onPress?: () => void }[] = [
     { label: t('profile.personalInfo'), icon: 'person', onPress: () => setEditVisible(true) },
     { label: t('profile.savedAddresses'), icon: 'location-on', onPress: () => setAddressVisible(true) },
-    { label: t('profile.paymentMethods'), icon: 'payments', onPress: () => Alert.alert(t('common.soon'), t('profile.paymentSoon')) },
+    { label: t('profile.paymentMethods'), icon: 'payments', onPress: () => setPaymentVisible(true) },
   ];
 
   const appItems: { label: string; icon: IconName; onPress?: () => void }[] = [
@@ -161,6 +163,7 @@ export default function ProfileScreen() {
 
       <EditProfileSheet visible={editVisible} onClose={() => setEditVisible(false)} />
       <DeliveryAddressSheet visible={addressVisible} onClose={() => setAddressVisible(false)} />
+      <PaymentMethodsSheet visible={paymentVisible} onClose={() => setPaymentVisible(false)} />
     </SafeAreaView>
   );
 }

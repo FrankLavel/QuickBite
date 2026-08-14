@@ -45,6 +45,15 @@ export default ({ config }) => ({
           'QuickBite accede a tus fotos para que elijas tu foto de perfil.',
       },
     ],
+    [
+      // Ícono pequeño (monocromo, blanco/transparente) y color de acento de las
+      // notificaciones push en Android. Sin esto, Android usa el ícono genérico.
+      'expo-notifications',
+      {
+        icon: './assets/notification-icon.png',
+        color: '#2caf4b',
+      },
+    ],
     '@react-native-google-signin/google-signin',
   ],
 });

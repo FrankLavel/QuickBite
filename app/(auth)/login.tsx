@@ -19,6 +19,7 @@ import { Icon } from '@/components/ui/Icon';
 import { palette } from '@/constants/colors';
 import { signIn, signUp, signInWithGoogle, resetPassword } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
+import { errorCode } from '@/lib/errors';
 
 /** Devuelve la clave i18n del error común de Firebase Auth. */
 function authErrorKey(code: string): string {
@@ -77,8 +78,8 @@ export default function LoginScreen() {
         await signUp(name, email, password);
       }
       router.replace('/(tabs)');
-    } catch (e: any) {
-      setError(t(authErrorKey(e?.code ?? '')));
+    } catch (e: unknown) {
+      setError(t(authErrorKey(errorCode(e))));
     } finally {
       setSubmitting(false);
     }
@@ -91,8 +92,8 @@ export default function LoginScreen() {
     try {
       const ok = await signInWithGoogle();
       if (ok) router.replace('/(tabs)');
-    } catch (e: any) {
-      const code = e?.code;
+    } catch (e: unknown) {
+      const code = errorCode(e);
       if (code === statusCodes.SIGN_IN_CANCELLED) {
         // El usuario cerró el selector: no es un error.
       } else if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
@@ -114,8 +115,8 @@ export default function LoginScreen() {
     try {
       await resetPassword(email);
       Alert.alert(t('auth.resetSentTitle'), t('auth.resetSentMsg'));
-    } catch (e: any) {
-      setError(t(authErrorKey(e?.code ?? '')));
+    } catch (e: unknown) {
+      setError(t(authErrorKey(errorCode(e))));
     }
   };
 

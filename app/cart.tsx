@@ -58,7 +58,11 @@ export default function CartScreen() {
       setApplying(true);
       setCouponError(null);
       try {
-        const result = await couponsService.validate(codeToApply, subtotal);
+        const result = await couponsService.validate(
+          codeToApply,
+          subtotal,
+          restaurantId ?? undefined
+        );
         if (result.valid) {
           setCoupon(result.coupon);
           setCode('');
@@ -88,7 +92,11 @@ export default function CartScreen() {
     setApplying(true);
     setCouponError(null);
     try {
-      const result = await couponsService.validate(code, subtotal);
+      const result = await couponsService.validate(
+        code,
+        subtotal,
+        restaurantId ?? undefined
+      );
       if (result.valid) {
         setCoupon(result.coupon);
         setCode('');
