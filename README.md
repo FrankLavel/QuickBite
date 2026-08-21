@@ -1,96 +1,94 @@
-# QuickBite — Portal del Restaurante
+<div align="center">
 
-Aplicación **Expo + React Native + TypeScript** para gestionar restaurantes.
+# 🍔 QuickBite · Portal del Restaurante
 
-Interfaz en **español**, paleta **negro / blanco / naranja**, alineada a los mockups del Merchant Portal y al modelo de datos de Firestore.
+**Panel de administración web para las fondas y restaurantes de QuickBite.**
 
-## Stack
+Pedidos en tiempo real, menú, promociones, horarios, liquidaciones y analítica — todo desde un solo lugar.
 
-- Expo (React Native) + TypeScript
-- React Navigation (stack + menú lateral)
-- Context API (auth, productos, pedidos)
-- Firebase Auth, Cloud Firestore, Storage
-- Expo Image Picker + Expo Secure Store
+[🌐 App en vivo](https://quickbite-6dee7.web.app) · Instalable como PWA en el escritorio
 
-## Proyecto Firebase
+</div>
 
-- **Project ID:** `quickbite-6dee7`
-- Configura `apiKey`, `appId` y `messagingSenderId` en `src/services/firebase.ts`
+---
 
-## Modelo de datos (según PDF)
+## ¿Qué es esto?
 
-| Ruta | Uso en el portal |
-|------|------------------|
-| `users/{uid}` | Perfil con `role: 'restaurant'` y `restaurantId` |
-| `restaurants/{restId}` | Datos del restaurante |
-| `restaurants/{restId}/categories/{catId}` | Categorías del menú |
-| `restaurants/{restId}/products/{prodId}` | Productos (CRUD) |
-| `orders/{orderId}` | Pedidos (`restaurantId`); el restaurante solo edita `status` y `estimatedTime` |
-| `offers/{offerId}` | Ofertas (listo para extender) |
-| `coupons/{code}` | Cupones de plataforma |
-| `users/{uid}/notifications/{id}` | Notificaciones del cliente (Cloud Functions) |
+QuickBite es una plataforma de pedidos a domicilio pensada para apoyar a las fondas de Michoacán, con una **comisión del 7%** (frente al 15–30% de las plataformas grandes). El ecosistema tiene **dos aplicaciones** sobre un mismo backend en la nube:
 
-### Producto (`products`)
+- **Portal del Restaurante** (este repositorio) — panel web.
+- **App móvil del cliente** (Android) — [repositorio aparte](https://github.com/FrankLavel/Quick_mobil).
 
-`id`, `categoryId`, `name`, `description`, `price`, `imageURL`, `isAvailable`, `toppings[]`, `tags[]`, `order`
+> Proyecto escolar, funcional y desplegado en **modo de pruebas (sandbox)**.
 
-### Pedido (`orders.status`)
+## Funcionalidades
 
-`pending` → `accepted` → `preparing` → `ready` → `on_the_way` → `delivered` | `rejected`
+- 📥 **Pedidos en tiempo real** — entran solos al panel; aceptar o rechazar con motivo.
+- 🍽️ **Menú** — categorías y platillos con imágenes (Firebase Storage).
+- 🎟️ **Promociones** — banners, cupones y ofertas de platillo con vigencia.
+- 🕒 **Horarios y estado** — abierto/cerrado automático por horario o manual.
+- 💵 **Liquidaciones** — cálculo de la comisión del 7% por periodo.
+- 📊 **Analítica** — mapa de calor de horas pico, KPIs de ventas y exportación a CSV.
+- 🌙 **Modo oscuro**, avisos en tiempo real y preferencias del panel.
+- 📲 **PWA** — instalable en el escritorio; verificada e indexada en Google Search Console.
 
-No existe entidad repartidor: el restaurante marca `on_the_way`.
+## Tecnologías
 
-### Storage
+| | |
+|---|---|
+| **Framework** | Expo `~53` · React Native Web · TypeScript |
+| **Navegación** | React Navigation |
+| **Estado** | React Context |
+| **Backend** | Firebase (Auth, Firestore, Storage, Cloud Functions, Hosting) |
+| **Despliegue** | Firebase Hosting |
 
-```
-/restaurants/{restId}/products/{prodId}.jpg
-/restaurants/{restId}/logo.jpg
-/restaurants/{restId}/cover.jpg
-```
+## Requisitos
 
-## Estructura
-
-```
-src/
-├── screens/        # Auth + panel (Panel, Pedidos, Entregas, Menú, …)
-├── components/     # UI + layout (sidebar, header)
-├── navigation/
-├── services/       # Firebase, auth, products, categories, orders, storage
-├── context/        # Auth, Product, Order
-├── hooks/
-├── types/          # Alineados al PDF
-└── utils/          # Tema, constantes, validación
-```
-
-## Pantallas (español)
-
-| Menú lateral | Pantalla |
-|--------------|----------|
-| Panel | Resumen / KPIs |
-| Pedidos | Pedidos en vivo (aceptar, cocina, listo) |
-| Entregas | Ready / en camino / entregado |
-| Menú | CRUD de productos + categorías |
-| Analíticas | Métricas desde pedidos reales |
-| Clientes | Agregado por `customerId` |
-| Notificaciones | Alertas operativas |
-| Configuración | Perfil restaurante + cerrar sesión |
+- Node.js 18+
+- Un proyecto de **Firebase**
+- Firebase CLI (`npm i -g firebase-tools`) para desplegar
 
 ## Instalación
 
 ```bash
-cd C:\Users\cuauh\quickbite
+git clone https://github.com/FrankLavel/Quick_web.git
+cd Quick_web
 npm install
-npx expo start
 ```
 
-1. Completa `src/services/firebase.ts` con las credenciales de `quickbite-6dee7`.
-2. En Firebase Console: Auth (Email/Password), Firestore y Storage activos.
-3. Asegura las reglas para que `role === 'restaurant'` pueda escribir su `restaurantId`, categorías, productos y el `status` de sus pedidos.
+### Configuración de Firebase
 
-## Registro
+Copia la plantilla y pega tus credenciales (el archivo real está en `.gitignore`):
 
-Al registrarse se crea:
+```bash
+cp firebase.config.example.ts firebase.config.ts
+# edita firebase.config.ts con tu apiKey, messagingSenderId y appId
+```
 
-1. Usuario en Firebase Auth
-2. `users/{uid}` con `role: 'restaurant'` y `restaurantId = uid`
-3. `restaurants/{uid}` con los datos del negocio
+## Scripts
+
+```bash
+npm start          # inicia Expo (elige web con la tecla w)
+npm run web        # abre directamente en el navegador
+npm run build:web  # exporta el sitio estático a dist/
+npm run deploy     # exporta + despliega a Firebase Hosting
+```
+
+## Despliegue
+
+```bash
+npm run deploy
+```
+
+Sube el panel a Firebase Hosting (**https://quickbite-6dee7.web.app**). El `firebase.json` está configurado solo para *hosting*, para no tocar las reglas de Firestore (que se administran desde el repo móvil).
+
+## Notas
+
+- Las cuentas de **restaurante no se auto-registran**: el administrador las provisiona por fuera del cliente (Admin SDK / consola), por seguridad. El portal es **solo login**.
+- Las reglas de seguridad y las Cloud Functions son la **fuente de verdad en el repo móvil**.
+
+---
+
+<div align="center">
+<sub>QuickBite · Proyecto de 9no cuatrimestre · Desarrollo y Gestión de Software</sub>
+</div>
