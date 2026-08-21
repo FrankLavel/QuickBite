@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { showAlert } from '@/store/dialogStore';
 import { MapAddressPicker } from '@/components/address/MapAddressPicker';
 import { Icon } from '@/components/ui/Icon';
 import { palette } from '@/constants/colors';
@@ -9,6 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usersService } from '@/services/users.service';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Address } from '@/types/user.types';
+import { reverseGeocode, forwardGeocode } from '@/lib/geocode';
 
 interface Props {
   visible: boolean;
@@ -16,13 +18,6 @@ interface Props {
 }
 
 type Coords = { lat: number; lng: number };
-
-/** Arma street/city a partir de un resultado de geocodificación inversa. */
-function fromGeocode(g: Location.LocationGeocodedAddress): { street: string; city: string } {
-  const street = [g.street ?? g.name, g.streetNumber].filter(Boolean).join(' ').trim();
-  const city = g.city ?? g.district ?? g.subregion ?? g.region ?? '';
-  return { street, city };
-}
 
 /** Selector de dirección: lista, predeterminada, agregar (GPS o búsqueda). */
 export function DeliveryAddressSheet({ visible, onClose }: Props) {
@@ -79,21 +74,20 @@ export function DeliveryAddressSheet({ visible, onClose }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('address.permTitle'), t('address.permMsg'));
+        void showAlert({ title: t('address.permTitle'), message: t('address.permMsg') });
         return;
       }
       const pos = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = pos.coords;
       setCoords({ lat: latitude, lng: longitude });
-      const [g] = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (g) {
-        const { street: s, city: c } = fromGeocode(g);
-        setStreet(s);
-        setCity(c);
+      const resolved = await reverseGeocode(latitude, longitude);
+      if (resolved) {
+        setStreet(resolved.street);
+        setCity(resolved.city);
         if (!label) setLabel(t('address.myLocation'));
       }
     } catch {
-      Alert.alert(t('common.error'), t('address.locError'));
+      void showAlert({ title: t('common.error'), message: t('address.locError') });
     } finally {
       setLocating(false);
     }
@@ -105,12 +99,8 @@ export function DeliveryAddressSheet({ visible, onClose }: Props) {
     // Si no hay coords (dirección escrita a mano), intenta geocodificar.
     let finalCoords = coords;
     if (finalCoords.lat === 0 && finalCoords.lng === 0) {
-      try {
-        const [geo] = await Location.geocodeAsync(`${street.trim()}, ${city.trim()}`);
-        if (geo) finalCoords = { lat: geo.latitude, lng: geo.longitude };
-      } catch {
-        // se queda en 0,0; las coords no son críticas para la app
-      }
+      const geo = await forwardGeocode(`${street.trim()}, ${city.trim()}`);
+      if (geo) finalCoords = geo;
     }
     const newAddr: Address = {
       label: label.trim() || t('address.defaultLabel'),

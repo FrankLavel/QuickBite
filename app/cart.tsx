@@ -12,6 +12,7 @@ import { restaurantsService } from '@/services/restaurants.service';
 import { couponsService, couponDiscount } from '@/services/coupons.service';
 import { DeliveryAddressSheet } from '@/components/address/DeliveryAddressSheet';
 import { Restaurant } from '@/types/restaurant.types';
+import { lineSubtotal, promoLabel, round2 } from '@/lib/promo';
 
 const cardShadow = {
   shadowColor: '#000',
@@ -117,7 +118,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-        <ScreenHeader showBack showSearch showNotifications={false} />
+        <ScreenHeader showBack showNotifications={false} />
         <View className="flex-1 items-center justify-center gap-4 px-8">
           <Icon name="shopping-bag" size={56} color="#bccbb9" />
           <Text className="text-lg font-bold text-on-surface">{t('cart.empty')}</Text>
@@ -143,7 +144,7 @@ export default function CartScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScreenHeader showBack showSearch showNotifications={false} />
+      <ScreenHeader showBack showNotifications={false} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -198,7 +199,23 @@ export default function CartScreen() {
                     </Text>
                   )}
                   <View className="flex-row justify-between items-center mt-2">
-                    <Text className="text-lg font-bold text-primary">${item.price.toFixed(2)}</Text>
+                    {item.promo ? (
+                      <View className="flex-row items-center gap-2">
+                        <View className="bg-primary px-2 py-0.5 rounded-full">
+                          <Text className="text-on-primary text-[10px] font-bold">{promoLabel(item.promo)}</Text>
+                        </View>
+                        {round2(lineSubtotal(item)) < round2(item.price * item.quantity) && (
+                          <Text className="text-sm text-on-surface-variant line-through">
+                            ${round2(item.price * item.quantity).toFixed(2)}
+                          </Text>
+                        )}
+                        <Text className="text-lg font-bold text-primary">
+                          ${round2(lineSubtotal(item)).toFixed(2)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-lg font-bold text-primary">${item.price.toFixed(2)}</Text>
+                    )}
                     <View className="flex-row items-center bg-surface-container px-2 py-1 rounded-full gap-2">
                       <TouchableOpacity
                         onPress={() => decrementItem(item.id)}

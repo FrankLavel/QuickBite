@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -14,6 +13,7 @@ import { palette } from '@/constants/colors';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSavedCards } from '@/hooks/useSavedCards';
 import { paymentsService } from '@/services/payments.service';
+import { showConfirm } from '@/store/dialogStore';
 import { OpenpayCardSheet } from './OpenpayCardSheet';
 import type { OpenpayToken } from '@/services/payments.service';
 import { SavedCard } from '@/types/card.types';
@@ -55,29 +55,24 @@ export function PaymentMethodsSheet({ visible, onClose }: Props) {
     }
   };
 
-  const removeCard = (c: SavedCard) => {
-    Alert.alert(
-      t('payment.removeTitle'),
-      `${cardLabel(c)}`,
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('payment.remove'),
-          style: 'destructive',
-          onPress: async () => {
-            setBusyId(c.id);
-            setError(null);
-            try {
-              await paymentsService.deleteCard(c.id);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : t('payment.removeError'));
-            } finally {
-              setBusyId(null);
-            }
-          },
-        },
-      ]
-    );
+  const removeCard = async (c: SavedCard) => {
+    const ok = await showConfirm({
+      title: t('payment.removeTitle'),
+      message: cardLabel(c),
+      confirmLabel: t('payment.remove'),
+      cancelLabel: t('common.cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(c.id);
+    setError(null);
+    try {
+      await paymentsService.deleteCard(c.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('payment.removeError'));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (

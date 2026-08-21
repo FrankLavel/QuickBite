@@ -3,8 +3,9 @@ import { Restaurant } from '@/types/restaurant.types';
 import { restaurantsService } from '@/services/restaurants.service';
 
 /**
- * Lista de restaurantes para el Home. Sin filtro trae los abiertos ordenados
- * por rating; con `cuisine` filtra por tipo de cocina.
+ * Lista de restaurantes para el Home. Sin filtro trae los abiertos en orden
+ * neutral (alfabético); con `cuisine` filtra por tipo de cocina. El orden por
+ * rating/envío es opt-in desde los filtros del Home.
  */
 export function useRestaurants(cuisine?: string) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);

@@ -11,7 +11,15 @@ const es: Record<string, string> = {
   'common.add': 'Agregar',
   'common.close': 'Cerrar',
   'common.back': 'Volver',
+  'common.gotIt': 'Entendido',
   'common.soon': 'Próximamente',
+
+  // Compartir (restaurante / platillo)
+  'share.dialogTitle': 'Compartir',
+  'share.restaurantMsg':
+    '🍽️ {name} en QuickBite\n{cuisines} · ⭐ {rating}\n\nÁbrelo en la app:\n{link}',
+  'share.productMsg':
+    '😋 {name} · {price}\nDe {restaurant} en QuickBite\n\nPídelo en la app:\n{link}',
 
   // Accesibilidad
   'a11y.title': 'Accesibilidad',
@@ -244,6 +252,7 @@ const es: Record<string, string> = {
   'product.instructionsPlaceholder': 'Ej: sin cebolla, servilletas extra...',
   'product.addToCart': 'Agregar — ${price}',
   'product.updateCart': 'Actualizar — ${price}',
+  'product.promoNow': 'Ahora ${price}',
   'product.noReviews': 'Nuevo',
 
   // Carrito
@@ -300,6 +309,14 @@ const es: Record<string, string> = {
   'checkout.closedTitle': 'Restaurante cerrado',
   'checkout.closedMsg':
     'El restaurante cerró. No puedes completar el pedido ahora mismo.',
+  'checkout.outOfRangeTitle': 'Fuera de la zona de reparto',
+  'checkout.outOfRangeMsg':
+    'Tu dirección está a {distance} km del restaurante, que solo entrega hasta {zone} km a la redonda. Elige otra dirección dentro del rango para completar el pedido.',
+  'checkout.outOfRangeBadge': 'Fuera de cobertura · {distance} km (máx. {zone} km)',
+  'checkout.contactPhone': 'Teléfono de contacto',
+  'checkout.contactPhoneHint': '10 dígitos, por si el restaurante te marca',
+  'checkout.phoneTitle': 'Falta tu teléfono',
+  'checkout.phoneMsg': 'Agrega un teléfono de contacto (10 dígitos) para que el restaurante pueda marcarte por tu pedido.',
   'checkout.paymentErrorTitle': 'Pago rechazado',
   'checkout.paymentCancelled': 'Pago cancelado.',
 
@@ -347,14 +364,7 @@ const es: Record<string, string> = {
   'confirmation.track': 'Seguir mi pedido',
   'confirmation.backHome': 'Volver al inicio',
 
-  // Splash / Login / varios
-  'splash.tagline': 'Rápido y fresco, siempre',
-  'splash.preparing': 'Preparando frescura...',
-  'splash.status0': 'Reuniendo ingredientes...',
-  'splash.status1': 'Encendiendo la parrilla...',
-  'splash.status2': 'Preparando tu pedido...',
-  'splash.status3': '¡Casi listo para servir!',
-  'splash.enjoy': '¡Disfruta tu comida!',
+  // Login / varios
   'login.tagline': 'Comida premium, entregada rápido.',
   'checkout.deliverTo': 'Entrega',
 
@@ -362,6 +372,7 @@ const es: Record<string, string> = {
   'tracking.notFound': 'Pedido no encontrado.',
   'tracking.eta': 'Tiempo estimado: {eta}',
   'tracking.from': 'De {name}',
+  'tracking.rejectedReason': 'Motivo del rechazo',
   'tracking.stepConfirmed': 'Confirmado',
   'tracking.stepKitchen': 'En cocina',
   'tracking.stepOnWay': 'En camino',
@@ -393,6 +404,7 @@ const es: Record<string, string> = {
   'auth.signinSub': 'Ingresa tus datos para seguir ordenando.',
   'auth.registerSub': 'Comienza tu viaje culinario hoy.',
   'auth.fullName': 'Nombre completo',
+  'auth.phone': 'Teléfono',
   'auth.email': 'Correo electrónico',
   'auth.password': 'Contraseña',
   'auth.forgot': '¿Olvidaste?',
@@ -405,6 +417,10 @@ const es: Record<string, string> = {
   'auth.privacy': 'Política de Privacidad',
   'auth.enterEmailPass': 'Ingresa tu correo y contraseña.',
   'auth.enterName': 'Ingresa tu nombre.',
+  'auth.enterPhone': 'Ingresa un teléfono válido (10 dígitos).',
+  'phoneStep.title': 'Agrega tu teléfono',
+  'phoneStep.sub': 'Lo usamos para que el restaurante pueda contactarte por tu pedido.',
+  'phoneStep.save': 'Guardar y continuar',
   'auth.forgotNoEmail': 'Ingresa tu correo para recuperar la contraseña.',
   'auth.resetSentTitle': 'Correo enviado',
   'auth.resetSentMsg': 'Te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja.',
@@ -415,6 +431,17 @@ const es: Record<string, string> = {
   'auth.errEmailInUse': 'Ya existe una cuenta con este correo.',
   'auth.errWeakPass': 'La contraseña debe tener al menos 6 caracteres.',
   'auth.errGeneric': 'Algo salió mal. Inténtalo de nuevo.',
+  'auth.errInvalidEmailFormat': 'Escribe un correo válido, por ejemplo nombre@correo.com.',
+  'verifyEmail.title': 'Verifica tu correo',
+  'verifyEmail.sub': 'Te enviamos un enlace a {email}. Ábrelo para activar tu cuenta y poder entrar.',
+  'verifyEmail.resend': 'Reenviar correo',
+  'verifyEmail.resentTitle': 'Correo reenviado',
+  'verifyEmail.resentMsg': 'Te reenviamos el enlace. Revisa tu bandeja de entrada y la carpeta de spam.',
+  'verifyEmail.check': 'Ya verifiqué mi correo',
+  'verifyEmail.notYetTitle': 'Aún sin verificar',
+  'verifyEmail.notYetMsg': 'No detectamos la verificación todavía. Abre el enlace que te enviamos y vuelve a intentar.',
+  'verifyEmail.changeAccount': 'Usar otra cuenta',
+  'verifyEmail.error': 'No se pudo enviar el correo. Espera un momento e inténtalo de nuevo.',
 
   // Onboarding
   'onboarding.titlePrefix': 'La entrega más rápida en tu ',
@@ -469,7 +496,15 @@ const en: Record<string, string> = {
   'common.add': 'Add',
   'common.close': 'Close',
   'common.back': 'Back',
+  'common.gotIt': 'Got it',
   'common.soon': 'Coming soon',
+
+  // Compartir (restaurante / platillo)
+  'share.dialogTitle': 'Share',
+  'share.restaurantMsg':
+    '🍽️ {name} on QuickBite\n{cuisines} · ⭐ {rating}\n\nOpen it in the app:\n{link}',
+  'share.productMsg':
+    '😋 {name} · {price}\nFrom {restaurant} on QuickBite\n\nGet it in the app:\n{link}',
 
   // Accessibility
   'a11y.title': 'Accessibility',
@@ -702,6 +737,7 @@ const en: Record<string, string> = {
   'product.instructionsPlaceholder': 'E.g., no onions, extra napkins...',
   'product.addToCart': 'Add to Cart — ${price}',
   'product.updateCart': 'Update — ${price}',
+  'product.promoNow': 'Now ${price}',
   'product.noReviews': 'New',
 
   // Cart
@@ -758,6 +794,14 @@ const en: Record<string, string> = {
   'checkout.closedTitle': 'Restaurant closed',
   'checkout.closedMsg':
     "The restaurant closed. You can't complete the order right now.",
+  'checkout.outOfRangeTitle': 'Outside delivery range',
+  'checkout.outOfRangeMsg':
+    'Your address is {distance} km from the restaurant, which only delivers within {zone} km. Choose another address within range to place the order.',
+  'checkout.outOfRangeBadge': 'Out of range · {distance} km (max {zone} km)',
+  'checkout.contactPhone': 'Contact phone',
+  'checkout.contactPhoneHint': '10 digits, in case the restaurant calls you',
+  'checkout.phoneTitle': 'Phone required',
+  'checkout.phoneMsg': 'Add a contact phone (10 digits) so the restaurant can call you about your order.',
   'checkout.paymentErrorTitle': 'Payment declined',
   'checkout.paymentCancelled': 'Payment cancelled.',
 
@@ -805,14 +849,7 @@ const en: Record<string, string> = {
   'confirmation.track': 'Track Your Order',
   'confirmation.backHome': 'Back to Home',
 
-  // Splash / Login / misc
-  'splash.tagline': 'Fast delivery, fresh food',
-  'splash.preparing': 'Preparing freshness...',
-  'splash.status0': 'Gathering ingredients...',
-  'splash.status1': 'Firing up the grill...',
-  'splash.status2': 'Getting your order ready...',
-  'splash.status3': 'Almost ready to serve!',
-  'splash.enjoy': 'Enjoy your meal!',
+  // Login / misc
   'login.tagline': 'Premium food, delivered promptly.',
   'checkout.deliverTo': 'Delivery',
 
@@ -820,6 +857,7 @@ const en: Record<string, string> = {
   'tracking.notFound': 'Order not found.',
   'tracking.eta': 'Estimated time: {eta}',
   'tracking.from': 'From {name}',
+  'tracking.rejectedReason': 'Rejection reason',
   'tracking.stepConfirmed': 'Confirmed',
   'tracking.stepKitchen': 'In kitchen',
   'tracking.stepOnWay': 'On the way',
@@ -851,6 +889,7 @@ const en: Record<string, string> = {
   'auth.signinSub': 'Enter your credentials to continue ordering.',
   'auth.registerSub': 'Start your culinary journey today.',
   'auth.fullName': 'Full Name',
+  'auth.phone': 'Phone',
   'auth.email': 'Email Address',
   'auth.password': 'Password',
   'auth.forgot': 'Forgot?',
@@ -863,6 +902,10 @@ const en: Record<string, string> = {
   'auth.privacy': 'Privacy Policy',
   'auth.enterEmailPass': 'Enter your email and password.',
   'auth.enterName': 'Enter your name.',
+  'auth.enterPhone': 'Enter a valid phone (10 digits).',
+  'phoneStep.title': 'Add your phone',
+  'phoneStep.sub': 'We use it so the restaurant can reach you about your order.',
+  'phoneStep.save': 'Save and continue',
   'auth.forgotNoEmail': 'Enter your email to reset the password.',
   'auth.resetSentTitle': 'Email sent',
   'auth.resetSentMsg': 'We sent you a link to reset your password. Check your inbox.',
@@ -873,6 +916,17 @@ const en: Record<string, string> = {
   'auth.errEmailInUse': 'An account already exists with this email.',
   'auth.errWeakPass': 'Password must be at least 6 characters.',
   'auth.errGeneric': 'Something went wrong. Try again.',
+  'auth.errInvalidEmailFormat': 'Enter a valid email, for example name@email.com.',
+  'verifyEmail.title': 'Verify your email',
+  'verifyEmail.sub': 'We sent a link to {email}. Open it to activate your account and sign in.',
+  'verifyEmail.resend': 'Resend email',
+  'verifyEmail.resentTitle': 'Email resent',
+  'verifyEmail.resentMsg': 'We resent the link. Check your inbox and your spam folder.',
+  'verifyEmail.check': "I've verified my email",
+  'verifyEmail.notYetTitle': 'Not verified yet',
+  'verifyEmail.notYetMsg': "We haven't detected the verification yet. Open the link we sent and try again.",
+  'verifyEmail.changeAccount': 'Use another account',
+  'verifyEmail.error': 'Could not send the email. Wait a moment and try again.',
 
   // Onboarding
   'onboarding.titlePrefix': 'Fastest delivery in your ',

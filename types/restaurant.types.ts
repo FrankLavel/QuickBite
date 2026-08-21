@@ -30,5 +30,7 @@ export interface Restaurant {
   /** Radio de cobertura de entrega en kilómetros. */
   deliveryZone: number;
   isOpen: boolean;
+  /** true/ausente = automático (respeta el horario); false = manual (isOpen manda). */
+  autoSchedule?: boolean;
   schedule: WeekSchedule;
 }

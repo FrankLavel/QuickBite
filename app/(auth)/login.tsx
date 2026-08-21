@@ -11,7 +11,6 @@ import {
   Animated,
   Easing,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { statusCodes } from '@react-native-google-signin/google-signin';
@@ -20,6 +19,7 @@ import { palette } from '@/constants/colors';
 import { signIn, signUp, signInWithGoogle, resetPassword } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { errorCode } from '@/lib/errors';
+import { showAlert } from '@/store/dialogStore';
 
 /** Devuelve la clave i18n del error común de Firebase Auth. */
 function authErrorKey(code: string): string {
@@ -39,11 +39,14 @@ function authErrorKey(code: string): string {
   }
 }
 
+// Validación básica de formato de correo (Firebase valida de nuevo en servidor).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const BG_IMAGE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBN1AwkqDIC5ZC4tIuSWPM5Fm_euTETOs9KJpEE0Y7j7pRbMtfgyxEcrDBOmmuJGb5begwCllyIiS4HHMmchWrfvwkl7R_qLfA37knKYo_YxB2jLnAK6kgygoKgbKaDUeqwuoD8oAdpHkuWDtcFXfn2WvycuA_XIyoE7IT4kntmHI_HDcqg03bxIGwZd0KDZ-fDuMgaFjcnR9SIxZchoohKTFw0ITItpzr7NZ2XuuHULDV7-b_n1Ld0yLzmzMQiZIUX4hxWve_b3PiL';
 
-const GOOGLE_LOGO =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuC3ruqI3A4nhJLQlSYq0Lr0q4T5eJL9UivHAJUOabTeKq1bQZGLW9NT_ScyAXIBl3XhNuHRoi0itJXDonXkS4Cf6KJhbjvnJ0Ydp3Ion2plpDgbdM8I87GGXuRicCT87b_6fCGjz0hC5iD2Zs9dR6GIIHMGKjlR1_g376KA5HHjfPTlQUhAzg2z_oOs6boU2Z1Qv_q8kED9PXW26aBhiui_Wqq5SBgdsrP0GswReMVYkHYklWlT4mMwb7uajqz3tvbm2swz3STucG3m';
+// Logo oficial de Google (hospedado por Google, para el botón "Continuar con Google").
+const GOOGLE_LOGO = 'https://developers.google.com/identity/images/g-logo.png';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -52,6 +55,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,8 +69,16 @@ export default function LoginScreen() {
       setError(t('auth.enterEmailPass'));
       return;
     }
+    if (!EMAIL_RE.test(email.trim())) {
+      setError(t('auth.errInvalidEmailFormat'));
+      return;
+    }
     if (mode === 'register' && !name.trim()) {
       setError(t('auth.enterName'));
+      return;
+    }
+    if (mode === 'register' && phone.replace(/\D/g, '').length < 10) {
+      setError(t('auth.enterPhone'));
       return;
     }
 
@@ -74,10 +86,12 @@ export default function LoginScreen() {
     try {
       if (mode === 'signin') {
         await signIn(email, password);
+        router.replace('/(tabs)');
       } else {
-        await signUp(name, email, password);
+        await signUp(name, phone.trim(), email, password);
+        // Bloqueo estricto: hasta verificar el correo no se entra a la app.
+        router.replace('/(auth)/verificar-correo');
       }
-      router.replace('/(tabs)');
     } catch (e: unknown) {
       setError(t(authErrorKey(errorCode(e))));
     } finally {
@@ -91,7 +105,9 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       const ok = await signInWithGoogle();
-      if (ok) router.replace('/(tabs)');
+      // Google no pasa por el registro → si falta el teléfono, se pide antes de
+      // entrar. La pantalla redirige sola a tabs si ya lo tiene.
+      if (ok) router.replace('/(auth)/completar-telefono');
     } catch (e: unknown) {
       const code = errorCode(e);
       if (code === statusCodes.SIGN_IN_CANCELLED) {
@@ -114,7 +130,7 @@ export default function LoginScreen() {
     setError(null);
     try {
       await resetPassword(email);
-      Alert.alert(t('auth.resetSentTitle'), t('auth.resetSentMsg'));
+      void showAlert({ title: t('auth.resetSentTitle'), message: t('auth.resetSentMsg') });
     } catch (e: unknown) {
       setError(t(authErrorKey(errorCode(e))));
     }
@@ -145,9 +161,11 @@ export default function LoginScreen() {
         <ScrollView contentContainerClassName="flex-grow justify-center items-center px-4 py-10">
           {/* Branding */}
           <View className="items-center mb-8">
-            <View className="bg-primary-container p-2 rounded-xl mb-4">
-              <Icon name="restaurant" size={32} color={palette.onPrimaryContainer} />
-            </View>
+            <Image
+              source={require('../../assets/icon.png')}
+              className="w-20 h-20 rounded-3xl mb-4"
+              resizeMode="cover"
+            />
             <Text className="text-4xl font-extrabold text-primary tracking-tight">QuickBite</Text>
             <Text className="text-secondary text-sm font-semibold mt-1">
               {t('login.tagline')}
@@ -209,6 +227,26 @@ export default function LoginScreen() {
                       placeholder="John Doe"
                       placeholderTextColor={palette.outline}
                       autoCapitalize="words"
+                      className="h-14 pl-12 pr-4 bg-white/50 border border-outline-variant rounded-2xl text-base text-on-surface"
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Teléfono (solo registro) — se usa para que el restaurante te contacte. */}
+              {mode === 'register' && (
+                <View className="gap-1 mb-4">
+                  <Text className="text-sm font-semibold text-on-surface-variant px-1">{t('auth.phone')}</Text>
+                  <View className="relative justify-center">
+                    <View className="absolute left-4 z-10">
+                      <Icon name="call" color={palette.outline} size={22} />
+                    </View>
+                    <TextInput
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder="10 dígitos"
+                      placeholderTextColor={palette.outline}
+                      keyboardType="phone-pad"
                       className="h-14 pl-12 pr-4 bg-white/50 border border-outline-variant rounded-2xl text-base text-on-surface"
                     />
                   </View>
@@ -315,8 +353,14 @@ export default function LoginScreen() {
             {/* Footer */}
             <View className="px-8 pb-8">
               <Text className="text-[11px] text-secondary text-center">
-                {t('auth.termsPrefix')} <Text className="text-primary underline">{t('auth.terms')}</Text> {t('auth.and')}{' '}
-                <Text className="text-primary underline">{t('auth.privacy')}</Text>
+                {t('auth.termsPrefix')}{' '}
+                <Text className="text-primary underline" onPress={() => router.push('/legal?doc=terms')}>
+                  {t('auth.terms')}
+                </Text>{' '}
+                {t('auth.and')}{' '}
+                <Text className="text-primary underline" onPress={() => router.push('/legal?doc=privacy')}>
+                  {t('auth.privacy')}
+                </Text>
               </Text>
             </View>
           </View>

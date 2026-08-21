@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon, IconName } from '@/components/ui/Icon';
+import { showAlert } from '@/store/dialogStore';
 import { palette } from '@/constants/colors';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
+import { usersService } from '@/services/users.service';
 import { restaurantsService } from '@/services/restaurants.service';
 import { ordersService } from '@/services/orders.service';
 import {
@@ -16,6 +19,8 @@ import {
 } from '@/services/payments.service';
 import { couponDiscount } from '@/services/coupons.service';
 import { isRestaurantOpen } from '@/lib/schedule';
+import { checkDeliveryCoverage } from '@/lib/geo';
+import { lineSubtotal } from '@/lib/promo';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSavedCards } from '@/hooks/useSavedCards';
 import { DeliveryAddressSheet } from '@/components/address/DeliveryAddressSheet';
@@ -77,6 +82,18 @@ export default function CheckoutScreen() {
   const defaultAddress =
     user?.addresses?.find((a) => a.isDefault) ?? user?.addresses?.[0] ?? null;
 
+  // Teléfono de contacto: obligatorio en el pedido para que el restaurante pueda
+  // marcar. Si la cuenta no lo tiene (p. ej. registro con Google), se pide aquí.
+  const [phone, setPhone] = useState('');
+  const needsPhone = !(user?.phone ?? '').trim();
+  const contactPhone = (user?.phone ?? '').trim() || phone.trim();
+
+  // Cobertura: ¿la dirección de entrega cae dentro del radio de reparto del
+  // restaurante? Falla en abierto si faltan datos (ver checkDeliveryCoverage).
+  const coverage = restaurant
+    ? checkDeliveryCoverage(restaurant, defaultAddress?.coords ?? null)
+    : { ok: true as const };
+
   const addNote = (text: string) =>
     setInstructions((prev) => (prev ? `${prev}, ${text}` : text));
 
@@ -84,22 +101,29 @@ export default function CheckoutScreen() {
   const buildOrderInput = (): NewOrderInput | null => {
     if (!user || !restaurantId || !defaultAddress) return null;
 
-    const orderItems: OrderItem[] = items.map((i) => ({
-      productId: i.productId,
-      name: i.name,
-      qty: i.quantity,
-      price: i.price,
-      toppings: i.toppings ?? [],
-      subtotal: round2(i.price * i.quantity),
-      // Solo incluir notes si existe (Firestore rechaza undefined).
-      ...(i.notes ? { notes: i.notes } : {}),
-    }));
+    const orderItems: OrderItem[] = items.map((i) => {
+      // Con promo, el precio unitario que se envía ya lleva el descuento (el
+      // servidor cobra price*qty), y el subtotal refleja la línea con promo.
+      const sub = round2(lineSubtotal(i));
+      const price = i.quantity > 0 ? sub / i.quantity : i.price;
+      return {
+        productId: i.productId,
+        name: i.name,
+        qty: i.quantity,
+        price,
+        toppings: i.toppings ?? [],
+        subtotal: sub,
+        // Solo incluir notes si existe (Firestore rechaza undefined).
+        ...(i.notes ? { notes: i.notes } : {}),
+        ...(i.promo ? { promo: i.promo } : {}),
+      };
+    });
 
     return {
       customerId: user.uid,
       // Nombre y teléfono denormalizados para que el restaurante los vea/contacte.
       ...(user.name?.trim() ? { customerName: user.name.trim() } : {}),
-      ...(user.phone?.trim() ? { customerPhone: user.phone.trim() } : {}),
+      ...(contactPhone ? { customerPhone: contactPhone } : {}),
       restaurantId,
       items: orderItems,
       subtotal: round2(subtotal),
@@ -123,13 +147,39 @@ export default function CheckoutScreen() {
     if (placing) return;
     if (!user || !restaurantId) return;
     if (!defaultAddress) {
-      Alert.alert(t('checkout.addressAlertTitle'), t('checkout.addressAlertMsg'));
+      void showAlert({ title: t('checkout.addressAlertTitle'), message: t('checkout.addressAlertMsg') });
       return;
     }
     // El restaurante debe estar abierto para completar el pedido.
     if (restaurant && !isRestaurantOpen(restaurant)) {
-      Alert.alert(t('checkout.closedTitle'), t('checkout.closedMsg'));
+      void showAlert({ title: t('checkout.closedTitle'), message: t('checkout.closedMsg') });
       return;
+    }
+    // La dirección debe estar dentro del radio de reparto del restaurante.
+    if (!coverage.ok) {
+      void showAlert({
+        title: t('checkout.outOfRangeTitle'),
+        message: t('checkout.outOfRangeMsg', {
+          distance: coverage.distanceKm!.toFixed(1),
+          zone: coverage.zoneKm!,
+        }),
+      });
+      return;
+    }
+    // Teléfono de contacto obligatorio (10 dígitos).
+    if (contactPhone.replace(/\D/g, '').length < 10) {
+      void showAlert({ title: t('checkout.phoneTitle'), message: t('checkout.phoneMsg') });
+      return;
+    }
+    // Si el usuario acaba de escribir su teléfono, lo guarda en su perfil para
+    // no volver a pedirlo en los próximos pedidos.
+    if (needsPhone && contactPhone) {
+      try {
+        await usersService.updateProfile(user.uid, { phone: contactPhone });
+        useAuthStore.getState().setUser({ ...user, phone: contactPhone });
+      } catch {
+        // no bloquea el pedido; el teléfono igual va en customerPhone
+      }
     }
 
     // Pago con tarjeta: se cobra vía Openpay (WebView + Cloud Function). El
@@ -156,7 +206,7 @@ export default function CheckoutScreen() {
       router.replace(`/confirmation?orderId=${orderId}`);
     } catch {
       setPlacing(false);
-      Alert.alert(t('common.error'), t('checkout.errorMsg'));
+      void showAlert({ title: t('common.error'), message: t('checkout.errorMsg') });
     }
   };
 
@@ -180,7 +230,7 @@ export default function CheckoutScreen() {
       setPlacing(false);
       const message =
         e instanceof Error && e.message ? e.message : t('checkout.errorMsg');
-      Alert.alert(t('checkout.paymentErrorTitle'), message);
+      void showAlert({ title: t('checkout.paymentErrorTitle'), message });
     }
   };
 
@@ -211,7 +261,7 @@ export default function CheckoutScreen() {
   const onDeviceError = (message: string) => {
     setSavedPayCardId(null);
     setPlacing(false);
-    Alert.alert(t('checkout.paymentErrorTitle'), message);
+    void showAlert({ title: t('checkout.paymentErrorTitle'), message });
   };
 
   if (items.length === 0 && !placing) {
@@ -278,6 +328,17 @@ export default function CheckoutScreen() {
                     {defaultAddress.references}
                   </Text>
                 )}
+                {!coverage.ok && (
+                  <View className="flex-row items-center gap-1 mt-1">
+                    <Icon name="error-outline" color={palette.error} size={14} />
+                    <Text className="text-xs font-semibold text-error flex-1">
+                      {t('checkout.outOfRangeBadge', {
+                        distance: coverage.distanceKm!.toFixed(1),
+                        zone: coverage.zoneKm!,
+                      })}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           ) : (
@@ -290,6 +351,28 @@ export default function CheckoutScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Teléfono de contacto (solo si la cuenta no lo tiene, p. ej. Google) */}
+        {needsPhone && (
+          <View className="bg-surface-container-lowest rounded-xl p-4" style={cardShadow}>
+            <Text className="text-sm font-bold uppercase tracking-wider text-secondary mb-2">
+              {t('checkout.contactPhone')}
+            </Text>
+            <View className="flex-row items-center gap-3">
+              <View className="bg-primary-container p-2 rounded-full">
+                <Icon name="call" color={palette.onPrimaryContainer} />
+              </View>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder={t('checkout.contactPhoneHint')}
+                placeholderTextColor={palette.outline}
+                keyboardType="phone-pad"
+                className="flex-1 h-11 px-3 bg-surface-container rounded-xl text-base text-on-surface"
+              />
+            </View>
+          </View>
+        )}
 
         {/* Delivery estimation banner */}
         <View className="bg-primary-container/10 border border-primary/20 rounded-xl p-4 flex-row items-center gap-4">
@@ -393,7 +476,7 @@ export default function CheckoutScreen() {
                   </View>
                 </View>
                 <Text className="text-sm font-bold text-on-surface">
-                  ${(item.price * item.quantity).toFixed(2)}
+                  ${round2(lineSubtotal(item)).toFixed(2)}
                 </Text>
               </View>
             ))}

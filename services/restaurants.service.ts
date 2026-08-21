@@ -109,7 +109,9 @@ export const restaurantsService = {
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() } as Restaurant))
             .filter((r) => r.isOpen)
-            .sort((a, b) => b.rating - a.rating)
+            // Orden neutral (alfabético): no entierra a los restaurantes nuevos
+            // sin puntuación. El orden por rating es opt-in desde los filtros.
+            .sort((a, b) => a.name.localeCompare(b.name))
         );
       },
       (error) => onError?.(error)
@@ -129,7 +131,7 @@ export const restaurantsService = {
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() } as Restaurant))
             .filter((r) => r.isOpen && r.cuisineTypes.includes(cuisine))
-            .sort((a, b) => b.rating - a.rating)
+            .sort((a, b) => a.name.localeCompare(b.name))
         );
       },
       (error) => onError?.(error)

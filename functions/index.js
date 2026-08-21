@@ -827,3 +827,111 @@ exports.refundOnCancel = onDocumentUpdated(
     console.log('Pedido reembolsado', event.params.orderId, after.openpayChargeId);
   }
 );
+
+// ---------------------------------------------------------------------------
+// share — Página web para compartir restaurante/platillo con vista previa rica
+// (Open Graph). Al compartir el enlace https en WhatsApp/redes, se muestra la
+// tarjeta con imagen + título + descripción; al abrirlo, botón para entrar a la
+// app (deep link quickbite://). Se sirve vía rewrite de Hosting:
+//   /r/{restaurantId}          -> restaurante
+//   /p/{restaurantId}/{prodId} -> platillo
+// ---------------------------------------------------------------------------
+const SHARE_BASE = 'https://quickbite-6dee7.web.app';
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+function sharePage({ title, description, image, url, deepLink }) {
+  const t = esc(title);
+  const d = esc(description);
+  const img = esc(image);
+  const u = esc(url);
+  const dl = esc(deepLink);
+  const imgTags = img
+    ? `<meta property="og:image" content="${img}"><meta name="twitter:image" content="${img}">`
+    : '';
+  return `<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${t} · QuickBite</title>
+<meta property="og:type" content="website"><meta property="og:site_name" content="QuickBite">
+<meta property="og:title" content="${t}"><meta property="og:description" content="${d}">
+<meta property="og:url" content="${u}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${t}"><meta name="twitter:description" content="${d}">
+${imgTags}
+<style>
+:root{--g:#086931;--g2:#2caf4b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f1f5f4;color:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:24px;overflow:hidden;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.12)}
+.cover{width:100%;aspect-ratio:16/10;object-fit:cover;background:#e2e8f0;display:block}
+.body{padding:22px}
+.brand{display:flex;align-items:center;gap:8px;color:var(--g);font-weight:800;font-size:14px;margin-bottom:10px}
+.brand .dot{width:22px;height:22px;border-radius:7px;background:var(--g);display:inline-block}
+h1{font-size:22px;line-height:1.25;margin-bottom:6px}
+p.desc{color:#475569;font-size:15px;margin-bottom:18px}
+a.btn{display:block;text-align:center;background:var(--g);color:#fff;text-decoration:none;font-weight:700;padding:15px;border-radius:999px;font-size:16px}
+.hint{color:#94a3b8;font-size:12px;text-align:center;margin-top:12px}
+</style></head><body>
+<div class="card">
+${img ? `<img class="cover" src="${img}" alt="${t}">` : ''}
+<div class="body">
+<div class="brand"><span class="dot"></span> QuickBite</div>
+<h1>${t}</h1>
+<p class="desc">${d}</p>
+<a class="btn" href="${dl}">Abrir en QuickBite</a>
+<p class="hint">Abre este enlace desde tu teléfono con la app QuickBite instalada.</p>
+</div></div></body></html>`;
+}
+
+exports.share = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const parts = (req.path || '').split('/').filter(Boolean);
+  try {
+    // /r/{restaurantId}
+    if (parts[0] === 'r' && parts[1]) {
+      const snap = await db.collection('restaurants').doc(parts[1]).get();
+      if (!snap.exists) return res.status(404).send('No encontrado');
+      const r = snap.data();
+      const html = sharePage({
+        title: r.name || 'Restaurante',
+        description:
+          (Array.isArray(r.cuisineTypes) && r.cuisineTypes.join(' · ')) ||
+          r.description ||
+          'Pide en QuickBite',
+        image: r.coverImage || r.logoImage || '',
+        url: `${SHARE_BASE}/r/${parts[1]}`,
+        deepLink: `quickbite://restaurant/${parts[1]}`,
+      });
+      res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+      return res.status(200).send(html);
+    }
+    // /p/{restaurantId}/{productId}
+    if (parts[0] === 'p' && parts[1] && parts[2]) {
+      const snap = await db
+        .collection('restaurants')
+        .doc(parts[1])
+        .collection('products')
+        .doc(parts[2])
+        .get();
+      if (!snap.exists) return res.status(404).send('No encontrado');
+      const p = snap.data();
+      const html = sharePage({
+        title: p.name || 'Platillo',
+        description: p.description || `$${Number(p.price || 0).toFixed(2)} · QuickBite`,
+        image: p.imageURL || '',
+        url: `${SHARE_BASE}/p/${parts[1]}/${parts[2]}`,
+        deepLink: `quickbite://product/${parts[2]}?restaurantId=${parts[1]}`,
+      });
+      res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+      return res.status(200).send(html);
+    }
+    return res.status(404).send('No encontrado');
+  } catch (e) {
+    console.error('share error', e);
+    return res.status(500).send('Error');
+  }
+});

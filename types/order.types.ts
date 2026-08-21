@@ -22,6 +22,14 @@ export interface OrderItemTopping {
   price: number;
 }
 
+/**
+ * Promoción aplicada a una línea del carrito (viene de una oferta de platillo).
+ * 'percent': N% de descuento (100 = gratis). '2x1': paga 1 de cada 2.
+ */
+export type LinePromo =
+  | { kind: 'percent'; percent: number }
+  | { kind: '2x1' };
+
 /** Ítem dentro del documento del pedido. */
 export interface OrderItem {
   productId: string;
@@ -78,6 +86,8 @@ export interface Order {
   /** Código del cupón aplicado. null si no se usó. */
   couponCode: string | null;
   specialInstructions?: string;
+  /** Motivo del rechazo escrito por el restaurante (status = 'rejected'). */
+  rejectionReason?: string;
   /** Minutos estimados de entrega, asignado por el restaurante al aceptar. */
   estimatedTime?: number;
   /** Calificación 1–5 enviada por el cliente en Order Confirmation. */
@@ -126,4 +136,6 @@ export interface CartItemType {
   imageURL?: string;
   /** Instrucciones especiales del cliente para este platillo (opcional). */
   notes?: string;
+  /** Promoción activa de una oferta de platillo (opcional). */
+  promo?: LinePromo;
 }

@@ -1,7 +1,7 @@
-import { Alert } from 'react-native';
 import { useCartStore } from '@/store/cartStore';
 import { useLangStore } from '@/store/langStore';
 import { translate } from '@/lib/i18n';
+import { showConfirm } from '@/store/dialogStore';
 import type { CartItemType } from '@/types/order.types';
 
 export function useCart() {
@@ -33,24 +33,12 @@ export function useCart() {
     newRestaurantId: string
   ): Promise<boolean> => {
     if (restaurantId && restaurantId !== newRestaurantId && items.length > 0) {
-      const ok = await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          translate(lang, 'cart.switchTitle'),
-          translate(lang, 'cart.switchMsg'),
-          [
-            {
-              text: translate(lang, 'cart.switchCancel'),
-              style: 'cancel',
-              onPress: () => resolve(false),
-            },
-            {
-              text: translate(lang, 'cart.switchConfirm'),
-              style: 'destructive',
-              onPress: () => resolve(true),
-            },
-          ],
-          { cancelable: true, onDismiss: () => resolve(false) }
-        );
+      const ok = await showConfirm({
+        title: translate(lang, 'cart.switchTitle'),
+        message: translate(lang, 'cart.switchMsg'),
+        confirmLabel: translate(lang, 'cart.switchConfirm'),
+        cancelLabel: translate(lang, 'cart.switchCancel'),
+        destructive: true,
       });
       if (!ok) return false;
     }

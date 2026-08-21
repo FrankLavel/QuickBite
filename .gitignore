@@ -37,6 +37,9 @@ yarn-error.*
 
 # Firebase / FCM credentials
 google-services.json
+
+# Clave de cuenta de servicio para los scripts de admin (NUNCA commitear)
+scripts/serviceAccount.json
 GoogleService-Info.plist
 
 # typescript

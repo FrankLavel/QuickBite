@@ -11,6 +11,7 @@ import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import { useAuthListener } from '@/hooks/useAuth';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ForegroundNotificationBanner } from '@/components/notifications/ForegroundNotificationBanner';
+import { DialogHost } from '@/components/ui/DialogHost';
 import { useThemeScheme, useFullScheme } from '@/hooks/useColors';
 import { useA11yStore } from '@/store/a11yStore';
 import { themeVars } from '@/lib/theme';
@@ -55,8 +56,10 @@ export default function RootLayout() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="accessibility" />
           <Stack.Screen name="security" />
+          <Stack.Screen name="legal" />
         </Stack>
         <ForegroundNotificationBanner />
+        <DialogHost />
       </View>
     </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -8,6 +8,12 @@
     "userInterfaceStyle": "light",
     "scheme": "quickbite",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0a209123-c2bd-4713-aba8-22d19961efc5"
+    },
     "plugins": [
       "expo-router",
       "expo-font"

@@ -8,9 +8,13 @@ const fs = require('fs');
 const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
 // Requerido para recibir push en Android (FCM). Descárgalo de Firebase →
 // app Android → google-services.json y colócalo en la raíz del proyecto.
-const googleServicesFile = fs.existsSync('./google-services.json')
-  ? './google-services.json'
-  : undefined;
+// En EAS, google-services.json NO está en el repo (gitignored): se inyecta como
+// variable de entorno de tipo "file" (GOOGLE_SERVICES_JSON = ruta al archivo).
+// En local se usa el archivo del repo. Sin esto, el build sale sin FCM y el
+// push falla con "DeviceNotRegistered".
+const googleServicesFile =
+  process.env.GOOGLE_SERVICES_JSON ||
+  (fs.existsSync('./google-services.json') ? './google-services.json' : undefined);
 
 export default ({ config }) => ({
   ...config,

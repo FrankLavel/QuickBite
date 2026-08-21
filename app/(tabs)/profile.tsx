@@ -76,20 +76,11 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       {/* TopAppBar */}
-      <View className="flex-row justify-between items-center px-4 py-2 bg-background">
+      <View className="flex-row items-center px-4 py-2 bg-background">
         <View className="flex-row items-center gap-2">
           <Icon name="person" color={palette.primary} />
           <Text className="text-xl font-bold text-primary">QuickBite</Text>
         </View>
-        <TouchableOpacity
-          onPress={() => router.push('/settings')}
-          activeOpacity={0.7}
-          className="w-10 h-10 rounded-full items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.appSettings')}
-        >
-          <Icon name="settings" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="px-4 py-6">

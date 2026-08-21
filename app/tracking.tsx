@@ -181,6 +181,15 @@ export default function TrackingScreen() {
                 {t('tracking.from', { name: restaurant.name })}
               </Text>
             )}
+            {isRejected && !!order.rejectionReason && (
+              <View className="mt-3 flex-row items-start gap-2 bg-error/10 border border-error/30 rounded-xl p-3">
+                <Icon name="info" color={palette.error} size={18} />
+                <View className="flex-1">
+                  <Text className="text-error font-bold text-sm">{t('tracking.rejectedReason')}</Text>
+                  <Text className="text-on-surface-variant text-sm mt-0.5">{order.rejectionReason}</Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Progress steps (oculto si fue rechazado o cancelado) */}

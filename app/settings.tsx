@@ -25,7 +25,7 @@ const cardShadow = {
 
 const legalLinks: { key: string; icon: IconName; route?: string }[] = [
   { key: 'settings.security', icon: 'shield', route: '/security' },
-  { key: 'settings.privacy', icon: 'lock' },
+  { key: 'settings.privacy', icon: 'lock', route: '/legal?doc=privacy' },
   { key: 'settings.accessibility', icon: 'accessibility-new', route: '/accessibility' },
 ];
 

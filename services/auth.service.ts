@@ -11,6 +11,7 @@ import {
   reauthenticateWithCredential,
   updatePassword,
   deleteUser,
+  sendEmailVerification,
   UserCredential,
   User,
 } from 'firebase/auth';
@@ -41,6 +42,24 @@ export const authService = {
   },
 
   resetPassword: (email: string) => sendPasswordResetEmail(auth, email.trim()),
+
+  /** Envía (o reenvía) el correo de verificación al usuario actual. */
+  sendVerification: () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('no-user');
+    return sendEmailVerification(user);
+  },
+
+  /**
+   * Refresca el usuario desde el servidor y devuelve si el correo ya quedó
+   * verificado. Se usa tras pedirle al usuario que abra el enlace del correo.
+   */
+  reloadUser: async (): Promise<boolean> => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    await user.reload();
+    return auth.currentUser?.emailVerified ?? false;
+  },
 
   /** Login con Google. Devuelve la credencial o null si el usuario cancela. */
   signInWithGoogle: async (): Promise<UserCredential | null> => {

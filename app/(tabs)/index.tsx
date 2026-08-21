@@ -26,7 +26,9 @@ const categories: { label: string; icon: IconName }[] = [
   { label: 'American', icon: 'fastfood' },
 ];
 
-type SortBy = 'rating' | 'fee';
+// 'default' = sin ordenar por el usuario (respeta el orden neutral del servicio,
+// alfabético). 'rating'/'fee' son opt-in desde el sheet de filtros.
+type SortBy = 'default' | 'rating' | 'fee';
 
 const cardShadow = {
   shadowColor: '#000',
@@ -57,10 +59,10 @@ export default function HomeScreen() {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [freeDeliveryOnly, setFreeDeliveryOnly] = useState(false);
   const [topRatedOnly, setTopRatedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortBy>('rating');
+  const [sortBy, setSortBy] = useState<SortBy>('default');
 
   const filtersActive =
-    freeDeliveryOnly || topRatedOnly || sortBy !== 'rating';
+    freeDeliveryOnly || topRatedOnly || sortBy !== 'default';
   const searchActive = !!search.trim();
   const anyActive = filtersActive || !!activeCategory || searchActive;
 
@@ -108,9 +110,13 @@ export default function HomeScreen() {
     if (freeDeliveryOnly) result = result.filter((r) => r.deliveryFee === 0);
     if (topRatedOnly) result = result.filter((r) => r.rating >= 4.5);
 
-    result = [...result].sort((a, b) =>
-      sortBy === 'fee' ? a.deliveryFee - b.deliveryFee : b.rating - a.rating
-    );
+    // Solo se reordena si el usuario eligió un criterio. En 'default' se respeta
+    // el orden neutral del servicio (alfabético) para no enterrar a los nuevos.
+    if (sortBy === 'fee') {
+      result = [...result].sort((a, b) => a.deliveryFee - b.deliveryFee);
+    } else if (sortBy === 'rating') {
+      result = [...result].sort((a, b) => b.rating - a.rating);
+    }
 
     return result;
     // `lang` en deps: la búsqueda de cocina usa la traducción visible (cuisineLabel).
@@ -131,7 +137,7 @@ export default function HomeScreen() {
     setActiveCategory(null);
     setFreeDeliveryOnly(false);
     setTopRatedOnly(false);
-    setSortBy('rating');
+    setSortBy('default');
   };
 
   return (
@@ -204,7 +210,12 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={offer.id}
                     activeOpacity={0.9}
-                    onPress={() => router.push(`/restaurant/${offer.restaurantId}`)}
+                    onPress={() =>
+                      // Oferta de platillo → abre el platillo; si no, el restaurante.
+                      offer.type === 'dish' && offer.productId
+                        ? router.push(`/product/${offer.productId}?restaurantId=${offer.restaurantId}`)
+                        : router.push(`/restaurant/${offer.restaurantId}`)
+                    }
                     className="w-72 h-44 rounded-2xl overflow-hidden"
                     style={cardShadow}
                   >

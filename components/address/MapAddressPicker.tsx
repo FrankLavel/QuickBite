@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { palette } from '@/constants/colors';
 import { useTranslation } from '@/hooks/useTranslation';
+import { showAlert } from '@/store/dialogStore';
+import { reverseGeocode, forwardGeocode } from '@/lib/geocode';
 
 export interface PickedAddress {
   street: string;
@@ -26,12 +28,6 @@ const DEFAULT_REGION: Region = {
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
 };
-
-function fromGeocode(g: Location.LocationGeocodedAddress): { street: string; city: string } {
-  const street = [g.street ?? g.name, g.streetNumber].filter(Boolean).join(' ').trim();
-  const city = g.city ?? g.district ?? g.subregion ?? g.region ?? '';
-  return { street, city };
-}
 
 export function MapAddressPicker({ visible, onClose, onConfirm }: Props) {
   const { t } = useTranslation();
@@ -81,11 +77,7 @@ export function MapAddressPicker({ visible, onClose, onConfirm }: Props) {
   const resolveCenter = async (r: Region) => {
     setResolving(true);
     try {
-      const [g] = await Location.reverseGeocodeAsync({
-        latitude: r.latitude,
-        longitude: r.longitude,
-      });
-      setAddress(g ? fromGeocode(g) : null);
+      setAddress(await reverseGeocode(r.latitude, r.longitude));
     } catch {
       setAddress(null);
     } finally {
@@ -103,7 +95,7 @@ export function MapAddressPicker({ visible, onClose, onConfirm }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('address.permTitle'), t('address.permMsg'));
+        void showAlert({ title: t('address.permTitle'), message: t('address.permMsg') });
         return;
       }
       const pos = await Location.getCurrentPositionAsync({});
@@ -114,7 +106,7 @@ export function MapAddressPicker({ visible, onClose, onConfirm }: Props) {
       };
       mapRef.current?.animateToRegion(next, 500);
     } catch {
-      Alert.alert(t('common.error'), t('address.locError'));
+      void showAlert({ title: t('common.error'), message: t('address.locError') });
     }
   };
 
@@ -122,19 +114,19 @@ export function MapAddressPicker({ visible, onClose, onConfirm }: Props) {
     if (searching || !query.trim()) return;
     setSearching(true);
     try {
-      const [geo] = await Location.geocodeAsync(query.trim());
+      const geo = await forwardGeocode(query.trim());
       if (!geo) {
-        Alert.alert(t('address.noResultsTitle'), t('address.noResultsMsg'));
+        void showAlert({ title: t('address.noResultsTitle'), message: t('address.noResultsMsg') });
         return;
       }
       const next: Region = {
         ...DEFAULT_REGION,
-        latitude: geo.latitude,
-        longitude: geo.longitude,
+        latitude: geo.lat,
+        longitude: geo.lng,
       };
       mapRef.current?.animateToRegion(next, 500);
     } catch {
-      Alert.alert(t('common.error'), t('address.searchError'));
+      void showAlert({ title: t('common.error'), message: t('address.searchError') });
     } finally {
       setSearching(false);
     }

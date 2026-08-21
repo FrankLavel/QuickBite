@@ -1,11 +1,17 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useEmailGate } from '@/hooks/useAuth';
 
 export default function TabsLayout() {
   const colors = useColors();
   const { t } = useTranslation();
+  const { needsVerification } = useEmailGate();
+
+  // Bloqueo estricto: no se entra al área con sesión sin verificar el correo.
+  if (needsVerification) return <Redirect href="/(auth)/verificar-correo" />;
+
   return (
     <Tabs
       screenOptions={{

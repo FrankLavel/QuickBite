@@ -11,6 +11,13 @@ export const config = {
     // (código de país + número).
     whatsapp: '527205561990',
   },
+  // Google Geocoding API (resolución de direcciones desde el cliente). Es la
+  // fuente principal en lib/geocode.ts por su precisión; si la key no está o la
+  // API no responde, se cae a Nominatim y al geocoder nativo. La key debe tener
+  // habilitada "Geocoding API" en Google Cloud (+ billing).
+  maps: {
+    apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+  },
   // Openpay (tokenización en el cliente). merchant id + PUBLIC key son seguros
   // en el cliente; la PRIVATE key vive solo en Cloud Functions (Secret Manager).
   openpay: {

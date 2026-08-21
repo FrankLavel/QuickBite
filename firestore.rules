@@ -168,7 +168,7 @@ service cloud.firestore {
                       ||
                       (isRestaurantOwner(resource.data.restaurantId)
                        && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt']))
+                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason']))
                     );
 
       allow delete: if false;

@@ -54,16 +54,19 @@ export function todayHoursLabel(schedule?: WeekSchedule): string {
 }
 
 /**
- * ¿El restaurante está abierto para pedir? El interruptor manual `isOpen` manda:
- * si el restaurante se marcó como cerrado, está cerrado. Si está marcado abierto,
- * se respeta el horario SOLO si tiene uno configurado (si no hay horario, se
- * considera abierto para no penalizar a quien no lo llenó).
+ * ¿El restaurante está abierto para pedir? Depende del modo:
+ *  - MANUAL (`autoSchedule === false`): manda el interruptor `isOpen`, se ignora
+ *    el horario.
+ *  - AUTOMÁTICO (default): respeta el horario configurado; si no hay horario, se
+ *    considera abierto (para no penalizar a quien no lo llenó).
  */
 export function isRestaurantOpen(r?: {
   isOpen?: boolean;
+  autoSchedule?: boolean;
   schedule?: WeekSchedule;
 }): boolean {
-  if (!r || r.isOpen === false) return false;
+  if (!r) return false;
+  if (r.autoSchedule === false) return r.isOpen !== false; // manual
   const hasSchedule = !!r.schedule && Object.keys(r.schedule).length > 0;
-  return hasSchedule ? isOpenNow(r.schedule) : true;
+  return hasSchedule ? isOpenNow(r.schedule) : true; // automático
 }

@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Image, TextInput, TouchableOpacity, ActivityIndicator, Share, Alert } from 'react-native';
+import { View, Text, ScrollView, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { showAlert } from '@/store/dialogStore';
+import { shareRestaurant } from '@/lib/share';
 import { Icon } from '@/components/ui/Icon';
 import { palette } from '@/constants/colors';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useCart } from '@/hooks/useCart';
+import { useOffers } from '@/hooks/useOffers';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 import { cartLineId } from '@/store/cartStore';
+import { offerPromoFor } from '@/lib/promo';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cuisineLabel } from '@/lib/i18n';
@@ -27,6 +31,7 @@ export default function RestaurantScreen() {
   const router = useRouter();
   const { restaurant, categories, products, loading } = useRestaurant(id);
   const { addItemGuarded, itemCount, total } = useCart();
+  const { offers } = useOffers();
   const { isFavorite, toggleFavorite, isFavoriteProduct, toggleFavoriteProduct } = useFavorites();
   const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -70,9 +75,10 @@ export default function RestaurantScreen() {
   const add = (product: Product) => {
     // Si el restaurante está cerrado, no se puede pedir.
     if (!open) {
-      Alert.alert(t('restaurant.closedTitle'), t('restaurant.closedMsg'));
+      void showAlert({ title: t('restaurant.closedTitle'), message: t('restaurant.closedMsg') });
       return;
     }
+    const promo = offerPromoFor(offers, restaurant.id, product.id);
     void addItemGuarded(
       {
         id: cartLineId(product.id),
@@ -81,6 +87,7 @@ export default function RestaurantScreen() {
         price: product.price,
         quantity: 1,
         imageURL: product.imageURL,
+        ...(promo ? { promo } : {}),
       },
       restaurant.id
     );
@@ -89,10 +96,7 @@ export default function RestaurantScreen() {
   const goToProduct = (product: Product) =>
     router.push(`/product/${product.id}?restaurantId=${restaurant.id}`);
 
-  const onShare = () =>
-    Share.share({
-      message: `Mira ${restaurant.name} en QuickBite — ${restaurant.cuisineTypes.join(', ')}`,
-    });
+  const onShare = () => void shareRestaurant(restaurant);
 
   // Tarjeta destacada (primer plato de la lista mostrada).
   const FeaturedCard = ({ item }: { item: Product }) => {
@@ -262,9 +266,9 @@ export default function RestaurantScreen() {
               {t('restaurant.minOrder', { amount: restaurant.minOrder.toFixed(2) })}
             </Text>
           </View>
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-start gap-2">
             <Icon name="location-on" color={palette.secondary} size={16} />
-            <Text className="text-sm text-on-surface-variant flex-1" numberOfLines={1}>
+            <Text className="text-sm text-on-surface-variant flex-1">
               {restaurant.address}
             </Text>
           </View>

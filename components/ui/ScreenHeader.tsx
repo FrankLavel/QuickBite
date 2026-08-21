@@ -7,7 +7,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 interface ScreenHeaderProps {
   title?: string;
   showBack?: boolean;
-  showSearch?: boolean;
   showFavorite?: boolean;
   /** Si el corazón está activo (relleno). */
   favoriteActive?: boolean;
@@ -24,7 +23,6 @@ interface ScreenHeaderProps {
 export function ScreenHeader({
   title = 'QuickBite',
   showBack = false,
-  showSearch = true,
   showFavorite = false,
   favoriteActive = false,
   showShare = false,
@@ -56,16 +54,6 @@ export function ScreenHeader({
       </View>
 
       <View className="flex-row items-center gap-1">
-        {showSearch && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            className="p-2 rounded-full"
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.search')}
-          >
-            <Icon name="search" color={actionColor} />
-          </TouchableOpacity>
-        )}
         {showFavorite && (
           <TouchableOpacity
             onPress={onFavorite}

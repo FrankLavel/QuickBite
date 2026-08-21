@@ -7,11 +7,16 @@ import { Icon } from '@/components/ui/Icon';
 import { palette } from '@/constants/colors';
 import { useProduct } from '@/hooks/useProduct';
 import { useCart } from '@/hooks/useCart';
+import { useOffers } from '@/hooks/useOffers';
 import { cartLineId } from '@/store/cartStore';
+import { offerPromoFor, lineSubtotal, promoLabel } from '@/lib/promo';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useProductReviews } from '@/hooks/useProductReviews';
 import { useTranslation } from '@/hooks/useTranslation';
 import { ProductReviewsSection } from '@/components/product/ProductReviewsSection';
+import { isRestaurantOpen } from '@/lib/schedule';
+import { showAlert } from '@/store/dialogStore';
+import { shareProduct } from '@/lib/share';
 
 const cardShadow = {
   shadowColor: '#000',
@@ -29,6 +34,7 @@ export default function ProductScreen() {
   const router = useRouter();
   const { product, restaurant, loading } = useProduct(restaurantId, id);
   const { addItemGuarded, removeItem, items } = useCart();
+  const { offers } = useOffers();
   const { isFavoriteProduct, toggleFavoriteProduct } = useFavorites();
   const { t } = useTranslation();
 
@@ -98,7 +104,23 @@ export default function ProductScreen() {
     );
   }
 
+  // El restaurante debe estar abierto para poder pedir. Se valida aquí (y no
+  // solo en el checkout) para bloquear al cliente en cuanto intenta agregar,
+  // no después de armar todo el pedido.
+  const open = isRestaurantOpen(restaurant);
+
+  // Oferta de platillo activa para este producto → descuento en el carrito.
+  const promo = offerPromoFor(offers, restaurant.id, product.id);
+  const unitPrice = total / quantity;
+  const discountedTotal = promo
+    ? lineSubtotal({ price: unitPrice, quantity, promo })
+    : total;
+
   const handleAdd = async () => {
+    if (!open) {
+      void showAlert({ title: t('restaurant.closedTitle'), message: t('restaurant.closedMsg') });
+      return;
+    }
     const chosenToppings = (product.toppings ?? [])
       .filter((t) => selected.includes(t.name))
       .map((t) => ({ name: t.name, price: t.price }));
@@ -116,6 +138,7 @@ export default function ProductScreen() {
         toppings: chosenToppings,
         imageURL: product.imageURL,
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        ...(promo ? { promo } : {}),
       },
       restaurant.id
     );
@@ -129,11 +152,11 @@ export default function ProductScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScreenHeader
         showBack
-        showSearch={false}
         showFavorite
         favoriteActive={isFavoriteProduct(restaurant.id, product.id)}
         onFavorite={() => toggleFavoriteProduct(restaurant.id, product.id)}
         showShare
+        onShare={() => void shareProduct(product, restaurant)}
         showNotifications={false}
       />
 
@@ -283,17 +306,36 @@ export default function ProductScreen() {
       {/* Bottom action bar */}
       <SafeAreaView edges={['bottom']} className="absolute bottom-0 left-0 w-full bg-background/95 border-t border-outline-variant/20">
         <View className="p-4">
+          {open && promo && (
+            <View className="flex-row items-center gap-2 mb-2">
+              <View className="bg-primary px-2 py-0.5 rounded-full">
+                <Text className="text-on-primary text-[11px] font-bold">{promoLabel(promo)}</Text>
+              </View>
+              {discountedTotal < total && (
+                <>
+                  <Text className="text-on-surface-variant text-sm line-through">
+                    ${total.toFixed(2)}
+                  </Text>
+                  <Text className="text-primary text-sm font-bold">
+                    {t('product.promoNow', { price: discountedTotal.toFixed(2) })}
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
           <TouchableOpacity
             onPress={handleAdd}
             activeOpacity={0.9}
-            className="bg-primary h-14 rounded-full flex-row items-center justify-center gap-3"
+            className={`h-14 rounded-full flex-row items-center justify-center gap-3 ${open ? 'bg-primary' : 'bg-on-surface/30'}`}
             style={{ shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 30, shadowOffset: { width: 0, height: 8 } }}
           >
-            <Icon name="shopping-basket" color="#ffffff" />
+            <Icon name={open ? 'shopping-basket' : 'lock'} color="#ffffff" />
             <Text className="text-white font-bold text-lg">
-              {t(editLineId ? 'product.updateCart' : 'product.addToCart', {
-                price: total.toFixed(2),
-              })}
+              {open
+                ? t(editLineId ? 'product.updateCart' : 'product.addToCart', {
+                    price: discountedTotal.toFixed(2),
+                  })
+                : t('restaurant.closedTitle')}
             </Text>
           </TouchableOpacity>
         </View>

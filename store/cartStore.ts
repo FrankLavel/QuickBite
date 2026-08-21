@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { CartItemType, OrderItemTopping } from '@/types/order.types';
 import { Coupon } from '@/types/coupon.types';
+import { cartTotal } from '@/lib/promo';
 
 /**
  * ID de línea del carrito: mismo producto + mismos toppings + misma nota = misma
@@ -73,5 +74,5 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ items, restaurantId, coupon: null, pendingCouponCode: null }),
   clearCart: () =>
     set({ items: [], restaurantId: null, coupon: null, pendingCouponCode: null }),
-  total: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+  total: () => cartTotal(get().items),
 }));
