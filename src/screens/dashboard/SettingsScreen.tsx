@@ -11,7 +11,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Switch,
   TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
@@ -52,7 +51,6 @@ export function SettingsScreen() {
   const [deliveryZone, setDeliveryZone] = useState(
     String(restaurant?.deliveryZone ?? 5)
   );
-  const [isOpen, setIsOpen] = useState(restaurant?.isOpen !== false);
   const [cover, setCover] = useState<CoverPickerValue>({
     previewUri: null,
     imageURL: '',
@@ -75,7 +73,6 @@ export function SettingsScreen() {
     setDeliveryFee(String(restaurant?.deliveryFee ?? 0));
     setMinOrder(String(restaurant?.minOrder ?? 0));
     setDeliveryZone(String(restaurant?.deliveryZone ?? 5));
-    setIsOpen(restaurant?.isOpen !== false);
     setCover({
       previewUri: restaurant?.coverImage || null,
       imageURL: restaurant?.coverImage ?? '',
@@ -136,7 +133,6 @@ export function SettingsScreen() {
       deliveryFee: parseFloat(deliveryFee) || 0,
       minOrder: parseFloat(minOrder) || 0,
       deliveryZone: parseFloat(deliveryZone) || 5,
-      isOpen,
       cuisineTypes,
       schedule,
     };
@@ -222,12 +218,6 @@ export function SettingsScreen() {
               Identidad de marca, horarios y operaciones del local
             </Text>
           </View>
-          <Button
-            title="Guardar cambios"
-            onPress={handleSave}
-            loading={saving}
-            style={styles.headSave}
-          />
         </View>
 
         {feedback ? (
@@ -297,48 +287,9 @@ export function SettingsScreen() {
             </SectionCard>
           </View>
 
-          {/* Columna lateral: estado y operaciones */}
+          {/* Columna lateral: operaciones (el estado abierto/cerrado se controla
+              desde la barra superior). */}
           <View style={wide ? styles.colSide : undefined}>
-            <View
-              style={[
-                styles.statusCard,
-                isOpen ? styles.statusOpen : styles.statusClosed,
-              ]}
-            >
-              <View
-                style={[
-                  styles.statusIcon,
-                  {
-                    backgroundColor: isOpen
-                      ? colors.primary
-                      : colors.danger,
-                  },
-                ]}
-              >
-                <Feather
-                  name={isOpen ? 'unlock' : 'lock'}
-                  size={18}
-                  color={colors.textOnPrimary}
-                />
-              </View>
-              <View style={styles.statusText}>
-                <Text style={styles.statusTitle}>
-                  {isOpen ? 'Abierto' : 'Cerrado'}
-                </Text>
-                <Text style={styles.statusDesc}>
-                  {isOpen
-                    ? 'Aceptando pedidos en la app'
-                    : 'No se muestran pedidos nuevos'}
-                </Text>
-              </View>
-              <Switch
-                value={isOpen}
-                onValueChange={setIsOpen}
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={isOpen ? colors.primary : colors.textMuted}
-              />
-            </View>
-
             <SectionCard
               title="Datos del responsable"
               subtitle="Contacto interno de la cuenta"

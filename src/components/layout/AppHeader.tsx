@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, typography } from '../../utils/theme';
+import { isRestaurantOpenNow } from '../../utils/schedule';
 import { useAuth } from '../../hooks/useAuth';
 import { UserAvatar, getProfileAvatarUri } from '../UserAvatar';
 import { ProfileMenu } from './ProfileMenu';
@@ -39,17 +40,38 @@ export function AppHeader({
   const { restaurant, user, updateProfile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
-  const isOpen = restaurant?.isOpen !== false;
 
-  // Cambia abierto/cerrado al instante (un toque). Escribe isOpen en Firestore,
-  // por lo que la app del cliente lo refleja en tiempo real.
+  // Modo: automático (respeta el horario) por defecto; manual = el interruptor manda.
+  const auto = restaurant?.autoSchedule !== false;
+  // Estado efectivo que ve el cliente (según el modo).
+  const effectiveOpen = restaurant ? isRestaurantOpenNow(restaurant) : false;
+
+  // Solo en modo MANUAL: abre/cierra al instante. Escribe en Firestore, por lo
+  // que la app del cliente lo refleja en tiempo real.
   const toggleOpen = async () => {
+    if (toggling || !restaurant || auto) return;
+    setToggling(true);
+    try {
+      await updateProfile(undefined, { isOpen: !(restaurant.isOpen !== false) });
+    } catch {
+      // updateProfile maneja el error; evitamos que truene el toque.
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  // Cambia entre automático (por horario) y manual (interruptor). Al pasar a
+  // manual, arranca desde el estado efectivo actual para que no dé un salto.
+  const toggleMode = async () => {
     if (toggling || !restaurant) return;
     setToggling(true);
     try {
-      await updateProfile(undefined, { isOpen: !isOpen });
+      await updateProfile(
+        undefined,
+        auto ? { autoSchedule: false, isOpen: effectiveOpen } : { autoSchedule: true }
+      );
     } catch {
-      // updateProfile maneja el error; evitamos que truene el toque.
+      // manejado en updateProfile
     } finally {
       setToggling(false);
     }
@@ -99,23 +121,54 @@ export function AppHeader({
         <View style={styles.searchSpacer} />
       )}
 
-      <Pressable
-        onPress={toggleOpen}
-        disabled={toggling}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isOpen ? 'Cerrar restaurante' : 'Abrir restaurante'
-        }
-        style={({ pressed }) => [
-          styles.status,
-          isOpen ? styles.statusOpen : styles.statusClosed,
-          (pressed || toggling) && styles.statusPressed,
-        ]}
-      >
-        <View style={[styles.dot, isOpen ? styles.dotOpen : styles.dotClosed]} />
-        <Text style={styles.statusText}>{isOpen ? 'Abierto' : 'Cerrado'}</Text>
-        <Feather name="power" size={12} color={colors.textMuted} />
-      </Pressable>
+      <View style={styles.statusWrap}>
+        {auto ? (
+          // Automático: estado calculado por el horario (no se toca a mano).
+          <View
+            style={[styles.status, effectiveOpen ? styles.statusOpen : styles.statusClosed]}
+          >
+            <View style={[styles.dot, effectiveOpen ? styles.dotOpen : styles.dotClosed]} />
+            <Text style={styles.statusText}>{effectiveOpen ? 'Abierto' : 'Cerrado'}</Text>
+          </View>
+        ) : (
+          // Manual: el interruptor manda; un toque abre/cierra.
+          <Pressable
+            onPress={toggleOpen}
+            disabled={toggling}
+            accessibilityRole="button"
+            accessibilityLabel={effectiveOpen ? 'Cerrar restaurante' : 'Abrir restaurante'}
+            style={({ pressed }) => [
+              styles.status,
+              effectiveOpen ? styles.statusOpen : styles.statusClosed,
+              (pressed || toggling) && styles.statusPressed,
+            ]}
+          >
+            <View style={[styles.dot, effectiveOpen ? styles.dotOpen : styles.dotClosed]} />
+            <Text style={styles.statusText}>{effectiveOpen ? 'Abierto' : 'Cerrado'}</Text>
+            <Feather name="power" size={12} color={colors.textMuted} />
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={toggleMode}
+          disabled={toggling}
+          accessibilityRole="button"
+          accessibilityLabel={
+            auto ? 'Cambiar a modo manual' : 'Cambiar a modo automático (por horario)'
+          }
+          style={({ pressed }) => [
+            styles.modeChip,
+            (pressed || toggling) && styles.statusPressed,
+          ]}
+        >
+          <Feather
+            name={auto ? 'clock' : 'sliders'}
+            size={12}
+            color={colors.primary}
+          />
+          <Text style={styles.modeText}>{auto ? 'Auto' : 'Manual'}</Text>
+        </Pressable>
+      </View>
 
       <Pressable
         style={({ pressed }) => [
@@ -193,6 +246,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     outlineStyle: 'none',
   } as object,
+  statusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   status: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -200,6 +258,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radius.full,
+  },
+  modeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+  },
+  modeText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primary,
   },
   statusOpen: { backgroundColor: colors.successSoft },
   statusClosed: { backgroundColor: colors.dangerSoft },

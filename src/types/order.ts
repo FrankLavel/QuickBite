@@ -56,6 +56,8 @@ export interface Order {
   settledAt?: unknown;
   couponCode: string | null;
   specialInstructions?: string;
+  /** Motivo del rechazo (lo escribe el restaurante al rechazar el pedido). */
+  rejectionReason?: string;
   estimatedTime?: number;
   rating?: number;
   createdAt?: unknown;

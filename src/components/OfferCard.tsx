@@ -66,7 +66,12 @@ export function OfferCard({
           <Text style={styles.description} numberOfLines={2}>
             {offer.description || 'Sin descripción.'}
           </Text>
-          {offer.couponCode ? (
+          {offer.type === 'dish' ? (
+            <View style={styles.couponChip}>
+              <Feather name="coffee" size={11} color={colors.primary} />
+              <Text style={styles.couponText}>PLATILLO</Text>
+            </View>
+          ) : offer.couponCode ? (
             <View style={styles.couponChip}>
               <Feather name="tag" size={11} color={colors.primary} />
               <Text style={styles.couponText}>{offer.couponCode}</Text>

@@ -21,6 +21,25 @@ import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Etiqueta bonita por ruta para el título de la pestaña (QuickBite · <pantalla>).
+const TAB_TITLES: Record<string, string> = {
+  Login: 'Iniciar sesión',
+  Panel: 'Panel',
+  Pedidos: 'Pedidos',
+  Entregas: 'Entregas',
+  Menu: 'Menú',
+  Promociones: 'Promociones',
+  Analiticas: 'Analíticas',
+  Liquidaciones: 'Liquidaciones',
+  Clientes: 'Clientes',
+  Notificaciones: 'Notificaciones',
+  Configuracion: 'Configuración',
+  Preferencias: 'Preferencias',
+  ProductForm: 'Menú',
+  CouponForm: 'Promociones',
+  OfferForm: 'Promociones',
+};
+
 function AuthenticatedApp() {
   return (
     <ProductProvider>
@@ -63,7 +82,15 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      documentTitle={{
+        formatter: (options, route) =>
+          `QuickBite · ${
+            options?.title ?? TAB_TITLES[route?.name ?? ''] ?? route?.name ?? 'Portal'
+          }`,
+      }}
+    >
       {user ? <AuthenticatedApp /> : <AuthNavigator />}
     </NavigationContainer>
   );

@@ -14,6 +14,9 @@ web-build/
 .env.local
 firebase.config.ts
 
+# Firebase deploy cache
+.firebase/
+
 # macOS
 .DS_Store
 

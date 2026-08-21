@@ -24,7 +24,7 @@ import { useOrders } from '../../hooks/useOrders';
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from '../../utils/constants';
 import type { Order, OrderStatus } from '../../types/order';
 import { colors, radius, shadows, spacing, typography } from '../../utils/theme';
-import { confirmAction } from '../../utils/confirm';
+import { RejectOrderDialog } from '../../components/RejectOrderDialog';
 import { formatCurrency } from '../../utils/format';
 import { notifyError } from '../../utils/notify';
 
@@ -131,6 +131,8 @@ export function OrdersScreen() {
   const wide = width >= 1024;
   const [filter, setFilter] = useState<Filter>('activos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [rejectTarget, setRejectTarget] = useState<Order | null>(null);
+  const [rejecting, setRejecting] = useState(false);
 
   const groups = useMemo(() => {
     const active = orders.filter((o) =>
@@ -174,7 +176,15 @@ export function OrdersScreen() {
         : filter === 'programados'
           ? groups.scheduled
           : groups.active;
-    return base.filter((o) => matchesOrder(o, searchQuery));
+    // Orden de llegada (FIFO): el pedido más viejo primero, para atender por
+    // prioridad de llegada. Los nuevos se agregan al final, sin empujar al viejo.
+    return base
+      .filter((o) => matchesOrder(o, searchQuery))
+      .sort(
+        (a, b) =>
+          (toDateSafe(a.createdAt)?.getTime() ?? 0) -
+          (toDateSafe(b.createdAt)?.getTime() ?? 0)
+      );
   }, [filter, groups, searchQuery]);
 
   const recentLog = useMemo(
@@ -199,17 +209,19 @@ export function OrdersScreen() {
     }
   };
 
-  const handleReject = async (order: Order) => {
-    const confirmed = await confirmAction(
-      'Rechazar pedido',
-      `¿Rechazar #${order.id.slice(0, 6)}?`,
-      { confirmText: 'Rechazar', cancelText: 'Cancelar', destructive: true }
-    );
-    if (!confirmed) return;
+  // Rechazar pide un motivo (diálogo) que se guarda para que el cliente lo vea.
+  const handleReject = (order: Order) => setRejectTarget(order);
+
+  const confirmReject = async (reason: string) => {
+    if (!rejectTarget) return;
+    setRejecting(true);
     try {
-      await setStatus(order.id, ORDER_STATUS.REJECTED);
+      await setStatus(rejectTarget.id, ORDER_STATUS.REJECTED, undefined, reason);
+      setRejectTarget(null);
     } catch {
       notifyError('No se pudo rechazar el pedido');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -355,6 +367,14 @@ export function OrdersScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <RejectOrderDialog
+        visible={!!rejectTarget}
+        orderLabel={rejectTarget ? `#${rejectTarget.id.slice(0, 6)}` : ''}
+        loading={rejecting}
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={confirmReject}
+      />
     </ScreenShell>
   );
 }

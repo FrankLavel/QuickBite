@@ -8,6 +8,7 @@ import React from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   Modal,
@@ -96,9 +97,11 @@ function SidebarContent({
     <>
       <View style={styles.brand}>
         <View style={styles.brandRow}>
-          <View style={styles.brandIcon}>
-            <Feather name="coffee" size={18} color={colors.primaryLight} />
-          </View>
+          <Image
+            source={require('../../../assets/images/logo-quickbite.png')}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
           <View>
             <Text style={styles.brandTitle}>QuickBite</Text>
             <Text style={styles.brandSubtitle}>Portal Restaurante</Text>
@@ -263,13 +266,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  brandIcon: {
+  brandLogo: {
     width: 40,
     height: 40,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(36, 226, 117, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   brandTitle: {
     ...typography.h3,

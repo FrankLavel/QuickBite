@@ -30,7 +30,12 @@ interface OrderContextValue {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  setStatus: (orderId: string, status: OrderStatus, estimatedTime?: number) => Promise<void>;
+  setStatus: (
+    orderId: string,
+    status: OrderStatus,
+    estimatedTime?: number,
+    rejectionReason?: string
+  ) => Promise<void>;
 }
 
 export const OrderContext = createContext<OrderContextValue | undefined>(
@@ -137,10 +142,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   }, [restaurantId, announceNewOrders]);
 
   const setStatus = useCallback(
-    async (orderId: string, status: OrderStatus, estimatedTime?: number) => {
-      await updateOrderStatus(orderId, status, estimatedTime);
+    async (
+      orderId: string,
+      status: OrderStatus,
+      estimatedTime?: number,
+      rejectionReason?: string
+    ) => {
+      await updateOrderStatus(orderId, status, estimatedTime, rejectionReason);
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status, estimatedTime } : o))
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status, estimatedTime, ...(rejectionReason ? { rejectionReason } : {}) }
+            : o
+        )
       );
     },
     []

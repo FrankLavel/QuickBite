@@ -50,6 +50,7 @@ function mapOrder(id: string, data: Record<string, unknown>): Order {
     settledAt: data.settledAt,
     couponCode: (data.couponCode as string | null) ?? null,
     specialInstructions: data.specialInstructions as string | undefined,
+    rejectionReason: data.rejectionReason as string | undefined,
     estimatedTime: data.estimatedTime as number | undefined,
     rating: data.rating as number | undefined,
     createdAt: data.createdAt,
@@ -124,21 +125,27 @@ export async function unmarkOrdersSettled(orderIds: string[]): Promise<void> {
   }
 }
 
-/** Actualiza solo status y/o estimatedTime (permisos del restaurante) */
+/** Actualiza status y/o estimatedTime (permisos del restaurante). Al rechazar,
+ *  guarda el motivo para que el cliente lo vea. */
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  estimatedTime?: number
+  estimatedTime?: number,
+  rejectionReason?: string
 ): Promise<void> {
   const payload: {
     status: OrderStatus;
     estimatedTime?: number;
+    rejectionReason?: string;
     acceptedAt?: ReturnType<typeof Timestamp.now>;
     deliveredAt?: ReturnType<typeof Timestamp.now>;
   } = { status };
 
   if (estimatedTime !== undefined) {
     payload.estimatedTime = estimatedTime;
+  }
+  if (status === ORDER_STATUS.REJECTED && rejectionReason?.trim()) {
+    payload.rejectionReason = rejectionReason.trim();
   }
 
   if (status === ORDER_STATUS.ACCEPTED) {

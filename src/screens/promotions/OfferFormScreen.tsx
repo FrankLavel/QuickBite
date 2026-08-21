@@ -15,22 +15,37 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import type { RootScreenProps } from '../../types/navigation';
 import { usePromotions } from '../../hooks/usePromotions';
+import { useAuth } from '../../hooks/useAuth';
+import { getProducts } from '../../services/productService';
 import { InputField } from '../../components/InputField';
 import { Button } from '../../components/Button';
 import { ProductImage } from '../../components/ProductImage';
 import { ModalFormShell } from '../../components/layout/ModalFormShell';
-import type { OfferFormData } from '../../types/offer';
+import type { OfferFormData, OfferType } from '../../types/offer';
+import type { Product } from '../../types/product';
 import { colors, radius, spacing, typography } from '../../utils/theme';
 import { notifyError } from '../../utils/notify';
 
 const emptyForm: OfferFormData = {
+  type: 'banner',
   badge: '',
   title: '',
   description: '',
   image: '',
   couponCode: '',
+  productId: '',
+  discountKind: '',
+  discountPercent: '',
+  startsAt: '',
+  endsAt: '',
   isActive: true,
 };
+
+const TYPE_OPTIONS: { key: OfferType; label: string; hint: string }[] = [
+  { key: 'banner', label: 'Banner', hint: 'Al tocarla abre el restaurante.' },
+  { key: 'coupon', label: 'Cupón', hint: 'Sugiere aplicar un cupón existente.' },
+  { key: 'dish', label: 'Platillo', hint: 'Al tocarla abre un platillo del menú.' },
+];
 
 export function OfferFormScreen({
   navigation,
@@ -39,11 +54,14 @@ export function OfferFormScreen({
   const offerId = route.params?.offerId;
   const isEditing = Boolean(offerId);
   const { addOffer, editOffer, getOfferForm, coupons } = usePromotions();
+  const { user } = useAuth();
+  const restaurantId = user?.restaurantId;
 
   const [form, setForm] = useState<OfferFormData>(emptyForm);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     if (offerId) {
@@ -54,6 +72,18 @@ export function OfferFormScreen({
       }
     }
   }, [offerId, getOfferForm]);
+
+  // Platillos del restaurante para el selector de oferta tipo 'dish'.
+  useEffect(() => {
+    if (!restaurantId) return;
+    let active = true;
+    getProducts(restaurantId)
+      .then((list) => active && setProducts(list))
+      .catch(() => active && setProducts([]));
+    return () => {
+      active = false;
+    };
+  }, [restaurantId]);
 
   const updateField = <K extends keyof OfferFormData>(
     key: K,
@@ -92,7 +122,16 @@ export function OfferFormScreen({
       next.description = 'La descripción es obligatoria';
     }
     if (!previewUri && !form.image.trim()) {
-      next.image = 'Sube una imagen para el banner';
+      next.image = 'Sube una imagen para la oferta';
+    }
+    if (form.type === 'dish' && !form.productId) {
+      next.productId = 'Elige el platillo que abrirá esta oferta';
+    }
+    if (form.type === 'coupon' && !form.couponCode.trim()) {
+      next.couponCode = 'Elige o escribe el cupón a vincular';
+    }
+    if (form.startsAt && form.endsAt && form.endsAt < form.startsAt) {
+      next.endsAt = 'La fecha de fin no puede ser anterior al inicio';
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -110,7 +149,7 @@ export function OfferFormScreen({
       navigation.goBack();
     } catch (err) {
       notifyError(
-        err instanceof Error ? err.message : 'No se pudo guardar el banner'
+        err instanceof Error ? err.message : 'No se pudo guardar la oferta'
       );
     } finally {
       setSubmitting(false);
@@ -119,13 +158,34 @@ export function OfferFormScreen({
 
   const couponOptions = coupons.map((c) => c.code);
 
+  const typeHint = TYPE_OPTIONS.find((o) => o.key === form.type)?.hint ?? '';
+
   return (
     <ModalFormShell
-      title={isEditing ? 'Editar banner' : 'Nuevo banner'}
-      subtitle="Banner visible en el Home de la app móvil."
+      title={isEditing ? 'Editar oferta' : 'Nueva oferta'}
+      subtitle="Promoción visible en el Home de la app móvil."
       onClose={() => navigation.goBack()}
     >
-      <Text style={styles.sectionLabel}>IMAGEN DEL BANNER</Text>
+      <Text style={styles.sectionLabel}>TIPO DE OFERTA</Text>
+      <View style={styles.typeRow}>
+        {TYPE_OPTIONS.map((opt) => {
+          const active = form.type === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.typeChip, active && styles.typeChipActive]}
+              onPress={() => updateField('type', opt.key)}
+            >
+              <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text style={styles.hint}>{typeHint}</Text>
+
+      <Text style={styles.sectionLabel}>IMAGEN DE LA OFERTA</Text>
 
       <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
         <ProductImage
@@ -166,46 +226,130 @@ export function OfferFormScreen({
         error={errors.description}
       />
 
-      <InputField
-        label="Cupón vinculado (opcional)"
-        value={form.couponCode}
-        onChangeText={(v) => updateField('couponCode', v.toUpperCase())}
-        placeholder="Código de cupón existente"
-        autoCapitalize="characters"
-      />
-      {couponOptions.length > 0 ? (
-        <View style={styles.couponChips}>
-          {couponOptions.map((code) => (
-            <TouchableOpacity
-              key={code}
-              style={[
-                styles.chip,
-                form.couponCode === code && styles.chipActive,
-              ]}
-              onPress={() => updateField('couponCode', code)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  form.couponCode === code && styles.chipTextActive,
-                ]}
-              >
-                {code}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ) : (
-        <Text style={styles.hint}>
-          Crea un cupón primero si quieres vincularlo a este banner.
-        </Text>
+      {form.type === 'coupon' && (
+        <>
+          <InputField
+            label="Cupón vinculado"
+            value={form.couponCode}
+            onChangeText={(v) => updateField('couponCode', v.toUpperCase())}
+            placeholder="Código de cupón existente"
+            autoCapitalize="characters"
+            error={errors.couponCode}
+          />
+          {couponOptions.length > 0 ? (
+            <View style={styles.couponChips}>
+              {couponOptions.map((code) => (
+                <TouchableOpacity
+                  key={code}
+                  style={[styles.chip, form.couponCode === code && styles.chipActive]}
+                  onPress={() => updateField('couponCode', code)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      form.couponCode === code && styles.chipTextActive,
+                    ]}
+                  >
+                    {code}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.hint}>
+              Crea un cupón primero si quieres vincularlo a esta oferta.
+            </Text>
+          )}
+        </>
       )}
+
+      {form.type === 'dish' && (
+        <>
+          <Text style={styles.sectionLabel}>PLATILLO VINCULADO</Text>
+          {products.length > 0 ? (
+            <View style={styles.couponChips}>
+              {products.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.chip, form.productId === p.id && styles.chipActive]}
+                  onPress={() => updateField('productId', p.id)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      form.productId === p.id && styles.chipTextActive,
+                    ]}
+                  >
+                    {p.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.hint}>
+              Este restaurante aún no tiene platillos en el menú.
+            </Text>
+          )}
+          {errors.productId ? (
+            <Text style={styles.error}>{errors.productId}</Text>
+          ) : null}
+
+          <Text style={styles.sectionLabel}>DESCUENTO</Text>
+          <View style={styles.typeRow}>
+            {([
+              { key: '', label: 'Sin descuento' },
+              { key: 'percent', label: 'Porcentaje' },
+              { key: '2x1', label: '2x1' },
+            ] as { key: OfferFormData['discountKind']; label: string }[]).map((opt) => {
+              const active = form.discountKind === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key || 'none'}
+                  style={[styles.typeChip, active && styles.typeChipActive]}
+                  onPress={() => updateField('discountKind', opt.key)}
+                >
+                  <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {form.discountKind === 'percent' ? (
+            <InputField
+              label="Porcentaje de descuento (0-100)"
+              value={form.discountPercent}
+              onChangeText={(v) => updateField('discountPercent', v)}
+              placeholder="15  (100 = gratis)"
+              keyboardType="decimal-pad"
+            />
+          ) : null}
+          <Text style={styles.hint}>
+            El descuento se aplica al platillo al agregarlo al carrito.
+          </Text>
+        </>
+      )}
+
+      <Text style={styles.sectionLabel}>VIGENCIA (OPCIONAL)</Text>
+      <InputField
+        label="Inicio (YYYY-MM-DD)"
+        value={form.startsAt}
+        onChangeText={(v) => updateField('startsAt', v)}
+        placeholder="2026-08-20"
+      />
+      <InputField
+        label="Fin (YYYY-MM-DD)"
+        value={form.endsAt}
+        onChangeText={(v) => updateField('endsAt', v)}
+        placeholder="2026-08-31"
+        error={errors.endsAt}
+      />
 
       <View style={styles.switchRow}>
         <View style={styles.switchText}>
-          <Text style={styles.switchTitle}>Banner visible</Text>
+          <Text style={styles.switchTitle}>Oferta visible</Text>
           <Text style={styles.switchSubtitle}>
-            Solo los banners activos se muestran en la app.
+            Solo las ofertas activas (y dentro de su vigencia) se muestran.
           </Text>
         </View>
         <Switch
@@ -237,6 +381,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
+  typeRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  typeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  typeChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  typeChipText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  typeChipTextActive: { color: colors.textOnPrimary },
   imagePicker: {
     height: 180,
     borderRadius: radius.lg,

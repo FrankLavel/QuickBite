@@ -393,29 +393,17 @@ export async function loadSession(
     throw error;
   }
 
-  if (!userSnap.exists()) {
-    try {
-      await ensureRestaurantProfile(fbUser);
-      userSnap = await getDoc(doc(db, COLLECTIONS.USERS, fbUser.uid));
-    } catch (repairError: unknown) {
-      const err = repairError as { code?: string; message?: string };
-      if (err.code === 'permission-denied') {
-        await firebaseSignOut(auth);
-        throw new Error(getFirestorePermissionMessage());
-      }
-      if (repairError instanceof Error && repairError.message) {
-        await firebaseSignOut(auth);
-        throw repairError;
-      }
-    }
-  }
-
+  // El portal ya NO auto-crea perfiles (se quitó el registro): los usuarios de
+  // restaurante los provisiona el administrador en Firestore. Si falta el
+  // perfil, se informa con claridad en lugar de intentar crearlo (lo cual las
+  // reglas bloquean por diseño).
   if (!userSnap.exists()) {
     await firebaseSignOut(auth);
     throw new Error(
-      'Tu cuenta existe en Firebase Auth pero no tiene perfil en Firestore (users/{uid}). ' +
-        'Publica las reglas de firestore.rules.example y regístrate de nuevo, o entra con Google ' +
-        'si registraste ese correo con Google.'
+      'Tu cuenta existe en Firebase Auth pero aún no tiene perfil de restaurante en ' +
+        'Firestore. El administrador debe crear users/{uid} (role: "restaurant", ' +
+        'restaurantId) y restaurants/{restaurantId} desde la consola de Firebase. ' +
+        'NO publiques firestore.rules.example: sobrescribiría las reglas de la app móvil.'
     );
   }
 

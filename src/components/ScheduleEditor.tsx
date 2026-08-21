@@ -77,11 +77,17 @@ export function ScheduleEditor({ value, onChange }: ScheduleEditorProps) {
         const day = value[key];
         const isOpen = Boolean(day);
         return (
-          <View key={key} style={styles.row}>
+          <View key={key} style={[styles.row, !isOpen && styles.rowClosed]}>
             <Text style={styles.dayLabel}>{label}</Text>
 
             {isOpen ? (
               <View style={styles.times}>
+                <Feather
+                  name="clock"
+                  size={14}
+                  color={colors.textSecondary}
+                  style={styles.clockIcon}
+                />
                 <TextInput
                   style={[styles.timeInput, noOutline]}
                   value={day?.open ?? ''}
@@ -103,7 +109,9 @@ export function ScheduleEditor({ value, onChange }: ScheduleEditorProps) {
                 />
               </View>
             ) : (
-              <Text style={styles.closed}>Cerrado</Text>
+              <View style={styles.times}>
+                <Text style={styles.closed}>Cerrado</Text>
+              </View>
             )}
 
             <Switch
@@ -146,17 +154,24 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    flexWrap: 'wrap',
+    gap: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    marginBottom: spacing.sm,
+  },
+  rowClosed: {
+    backgroundColor: 'transparent',
+    borderStyle: 'dashed',
   },
   dayLabel: {
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: '700',
-    width: 78,
+    width: 88,
   },
   times: {
     flex: 1,
@@ -165,23 +180,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minWidth: 170,
   },
+  clockIcon: { marginRight: 2 },
   timeInput: {
     ...typography.bodySmall,
     color: colors.text,
+    fontWeight: '600',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: 6,
+    borderRadius: radius.sm,
+    paddingVertical: 7,
     paddingHorizontal: spacing.sm,
-    width: 72,
+    width: 74,
   },
-  sep: { ...typography.caption, color: colors.textMuted },
+  sep: { ...typography.caption, color: colors.textMuted, marginHorizontal: 2 },
   closed: {
     ...typography.bodySmall,
     color: colors.textMuted,
     fontStyle: 'italic',
-    flex: 1,
-    minWidth: 120,
   },
 });

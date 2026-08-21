@@ -1,24 +1,24 @@
 /**
  * screens/auth/LoginScreen.tsx
- * Login en español + inicio de sesión con Google.
+ * Login del portal: SOLO correo y contraseña. No hay registro ni acceso con
+ * Google — el administrador da de alta los usuarios desde Firebase.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import type { ComponentProps } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
   useWindowDimensions,
-  Switch,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { Feather } from '@expo/vector-icons';
 import type { AuthScreenProps } from '../../types/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { InputField } from '../../components/InputField';
@@ -26,15 +26,20 @@ import { Button } from '../../components/Button';
 import { isValidEmail, isValidPassword } from '../../utils/validation';
 import { isFirebaseConfigured } from '../../services/firebase';
 import { sendRestaurantPasswordReset } from '../../services/authService';
-import { googleWebClientId } from '../../../firebase.config';
 import { colors, radius, spacing, typography } from '../../utils/theme';
 import { notifySuccess, notifyError } from '../../utils/notify';
 
-WebBrowser.maybeCompleteAuthSession();
+// Verde oscuro del hero: tono oscuro de la misma marca verde del dashboard.
+const BRAND_DARK = '#0b3a21';
 
-export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
-  const { login, loginWithGoogle, loginWithGoogleIdToken, error, clearError } =
-    useAuth();
+const FEATURES: { icon: ComponentProps<typeof Feather>['name']; label: string }[] = [
+  { icon: 'bar-chart-2', label: 'Reportes en\ntiempo real' },
+  { icon: 'box', label: 'Pedidos y menús\ncentralizados' },
+  { icon: 'users', label: 'Clientes más\nsatisfechos' },
+];
+
+export function LoginScreen(_props: AuthScreenProps<'Login'>) {
+  const { login, error, clearError } = useAuth();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
 
@@ -42,40 +47,11 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
   }>({});
   const [resetMessage, setResetMessage] = useState<string | null>(null);
-
-  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    webClientId: googleWebClientId || undefined,
-    iosClientId: googleWebClientId || undefined,
-    androidClientId: googleWebClientId || undefined,
-  });
-
-  useEffect(() => {
-    if (!googleResponse) return;
-
-    if (googleResponse.type === 'dismiss' || googleResponse.type === 'cancel') {
-      setGoogleLoading(false);
-      return;
-    }
-
-    if (googleResponse.type !== 'success') return;
-
-    const idToken = googleResponse.authentication?.idToken;
-    if (!idToken) return;
-
-    setGoogleLoading(true);
-    clearError();
-    loginWithGoogleIdToken(idToken)
-      .catch(() => {
-        // error en contexto
-      })
-      .finally(() => setGoogleLoading(false));
-  }, [googleResponse, loginWithGoogleIdToken, clearError]);
 
   const validate = () => {
     const next: typeof fieldErrors = {};
@@ -122,37 +98,6 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    clearError();
-
-    if (Platform.OS === 'web') {
-      setGoogleLoading(true);
-      try {
-        await loginWithGoogle();
-      } catch {
-        // error en contexto
-      } finally {
-        setGoogleLoading(false);
-      }
-      return;
-    }
-
-    if (!googleWebClientId) {
-      clearError();
-      // Mostrar error manualmente vía throw en hook - use setState local
-      return;
-    }
-
-    setGoogleLoading(true);
-    try {
-      await promptGoogleAsync();
-    } catch {
-      setGoogleLoading(false);
-    }
-  };
-
-  const showGoogleClientIdHint =
-    Platform.OS !== 'web' && !googleWebClientId && isFirebaseConfigured;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -166,24 +111,59 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
         >
           <View style={[styles.card, isWide && styles.cardWide]}>
             <View style={[styles.brandPanel, isWide && styles.brandPanelWide]}>
-              <View style={styles.logoRow}>
-                <Text style={styles.logoIcon}>🍴</Text>
-                <Text style={styles.logoText}>QuickBite</Text>
+              <View style={styles.brandDecor} pointerEvents="none" />
+
+              <View style={styles.brandTop}>
+                <View style={styles.logoRow}>
+                  <Image
+                    source={require('../../../assets/images/logo-quickbite.png')}
+                    style={styles.logoImg}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.logoText}>QuickBite</Text>
+                </View>
+
+                <Text style={styles.brandTitle}>
+                  Administra tu{' '}
+                  <Text style={styles.brandTitleAccent}>restaurante</Text> como un
+                  profesional
+                </Text>
+                <Text style={styles.brandSubtitle}>
+                  Gestiona pedidos, menús, inventario y crecimiento en tiempo real
+                  desde un solo lugar.
+                </Text>
+
+                <View style={styles.metricCard}>
+                  <View style={styles.metricChart}>
+                    <Feather name="trending-up" size={24} color={colors.primaryLight} />
+                  </View>
+                  <View style={styles.metricTextCol}>
+                    <Text style={styles.metricValue}>+24%</Text>
+                    <Text style={styles.metricLabel}>Ingresos este mes</Text>
+                    <Text style={styles.metricHint}>vs. el mes pasado</Text>
+                  </View>
+                  <View style={styles.metricBadge}>
+                    <Feather name="arrow-up-right" size={18} color={colors.textOnPrimary} />
+                  </View>
+                </View>
               </View>
-              <Text style={styles.brandTitle}>
-                Administra tu restaurante de forma eficiente
-              </Text>
-              <Text style={styles.brandSubtitle}>
-                El portal todo-en-uno para pedidos, menú y crecimiento en tiempo
-                real.
-              </Text>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricValue}>+24% Ingresos</Text>
-                <Text style={styles.metricHint}>vs. el mes pasado</Text>
+
+              <View style={styles.featuresRow}>
+                {FEATURES.map((f) => (
+                  <View key={f.label} style={styles.featureItem}>
+                    <View style={styles.featureIcon}>
+                      <Feather name={f.icon} size={20} color={colors.primaryLight} />
+                    </View>
+                    <Text style={styles.featureLabel}>{f.label}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
             <View style={[styles.formPanel, isWide && styles.formPanelWide]}>
+              <View style={styles.shieldBadge}>
+                <Feather name="shield" size={22} color={colors.primary} />
+              </View>
               <Text style={styles.welcome}>Bienvenido de nuevo</Text>
               <Text style={styles.welcomeHint}>
                 Accede de forma segura a tu panel de restaurante
@@ -212,30 +192,26 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 error={fieldErrors.password}
               />
 
-              <View style={styles.rememberRow}>
-                <Switch
-                  value={remember}
-                  onValueChange={setRemember}
-                  trackColor={{ false: colors.border, true: colors.primarySoft }}
-                  thumbColor={remember ? colors.primary : colors.textMuted}
-                />
+              <TouchableOpacity
+                style={styles.rememberRow}
+                onPress={() => setRemember(!remember)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.checkbox, remember && styles.checkboxOn]}>
+                  {remember ? (
+                    <Feather name="check" size={13} color={colors.textOnPrimary} />
+                  ) : null}
+                </View>
                 <Text style={styles.rememberText}>
                   Recordar este dispositivo por 30 días
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {!isFirebaseConfigured ? (
                 <Text style={styles.configBanner}>
                   Abre firebase.config.ts en la raíz del proyecto y pega tu
                   apiKey, messagingSenderId y appId completos desde Firebase
                   Console.
-                </Text>
-              ) : null}
-
-              {showGoogleClientIdHint ? (
-                <Text style={styles.configBanner}>
-                  Para Google en móvil, agrega googleWebClientId en
-                  firebase.config.ts (Firebase → Auth → Google → Web client ID).
                 </Text>
               ) : null}
 
@@ -250,44 +226,12 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
                 loading={submitting}
               />
 
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>O continúa con</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.googleButton}
-                onPress={handleGoogleLogin}
-                disabled={googleLoading || submitting}
-                activeOpacity={0.85}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <>
-                    <Text style={styles.googleIcon}>G</Text>
-                    <Text style={styles.googleText}>
-                      Continuar con Google
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  clearError();
-                  navigation.navigate('Register');
-                }}
-                style={styles.applyRow}
-              >
-                <Text style={styles.applyText}>
-                  ¿No tienes cuenta de restaurante?{' '}
-                  <Text style={styles.applyLink}>Regístrate ahora</Text>
+              <View style={styles.encryptedRow}>
+                <Feather name="shield" size={13} color={colors.textMuted} />
+                <Text style={styles.encrypted}>
+                  Conexión segura cifrada con AES de 256 bits
                 </Text>
-              </TouchableOpacity>
-
-              <Text style={styles.encrypted}>CIFRADO AES DE 256 BITS</Text>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -313,42 +257,112 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-  cardWide: { flexDirection: 'row', minHeight: 520 },
+  cardWide: { flexDirection: 'row', minHeight: 620, maxWidth: 1040 },
   brandPanel: {
-    backgroundColor: colors.primary,
+    backgroundColor: BRAND_DARK,
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.lg,
+    position: 'relative',
+    overflow: 'hidden',
   },
   brandPanelWide: {
     flex: 1,
     padding: spacing.xl,
     justifyContent: 'space-between',
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logoIcon: { fontSize: 22 },
-  logoText: { ...typography.h3, color: colors.primaryLight },
-  brandTitle: {
-    ...typography.h1,
-    color: colors.textOnPrimary,
-    marginTop: spacing.md,
+  brandDecor: {
+    position: 'absolute',
+    right: -80,
+    top: -40,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(36, 226, 117, 0.06)',
   },
+  brandTop: { gap: spacing.md },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoImg: { width: 34, height: 34, borderRadius: radius.sm },
+  logoText: { ...typography.h3, color: colors.textOnPrimary, fontWeight: '800' },
+  brandTitle: {
+    fontSize: 34,
+    lineHeight: 41,
+    fontWeight: '800',
+    color: colors.textOnPrimary,
+    marginTop: spacing.lg,
+  },
+  brandTitleAccent: { color: colors.primaryLight },
   brandSubtitle: {
-    ...typography.bodySmall,
+    ...typography.body,
     color: colors.textSoft,
-    lineHeight: 20,
+    lineHeight: 24,
+    marginTop: spacing.sm,
   },
   metricCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     marginTop: spacing.lg,
-    backgroundColor: 'rgba(36, 226, 117, 0.15)',
+    backgroundColor: 'rgba(36, 226, 117, 0.1)',
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(36, 226, 117, 0.35)',
+    borderColor: 'rgba(36, 226, 117, 0.28)',
   },
-  metricValue: { ...typography.h3, color: colors.primaryLight },
-  metricHint: { ...typography.caption, color: 'rgba(255,255,255,0.7)' },
+  metricChart: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(36, 226, 117, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricTextCol: { flex: 1 },
+  metricValue: { fontSize: 24, fontWeight: '800', color: colors.primaryLight },
+  metricLabel: {
+    ...typography.bodySmall,
+    color: colors.textOnPrimary,
+    fontWeight: '700',
+  },
+  metricHint: { ...typography.caption, color: 'rgba(255,255,255,0.6)' },
+  metricBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featuresRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  featureItem: { flex: 1, alignItems: 'center', gap: spacing.sm },
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureLabel: {
+    ...typography.caption,
+    color: colors.textSoft,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
   formPanel: { padding: spacing.lg },
   formPanelWide: { flex: 1.1, padding: spacing.xl, justifyContent: 'center' },
+  shieldBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
   welcome: { ...typography.h1, color: colors.text },
   welcomeHint: {
     ...typography.bodySmall,
@@ -360,8 +374,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   rememberText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
@@ -394,52 +419,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     lineHeight: 18,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginVertical: spacing.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    ...typography.caption,
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-  },
-  googleButton: {
+  encryptedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 48,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.sm,
+    gap: 6,
+    marginTop: spacing.md,
   },
-  googleIcon: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#4285F4',
-  },
-  googleText: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  applyRow: { alignItems: 'center', marginTop: spacing.lg },
-  applyText: { ...typography.bodySmall, color: colors.textSecondary },
-  applyLink: { color: colors.primary, fontWeight: '700' },
   encrypted: {
     ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    marginTop: spacing.md,
-    letterSpacing: 1,
   },
 });

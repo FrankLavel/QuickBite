@@ -86,7 +86,7 @@ export function PromotionsScreen() {
 
   const handleDeleteOffer = async (id: string, title: string) => {
     const confirmed = await confirmAction(
-      'Eliminar banner',
+      'Eliminar oferta',
       `¿Eliminar "${title}"?`,
       { confirmText: 'Eliminar', destructive: true }
     );
@@ -95,7 +95,7 @@ export function PromotionsScreen() {
       await removeOffer(id);
     } catch (err) {
       notifyError(
-        err instanceof Error ? err.message : 'No se pudo eliminar el banner'
+        err instanceof Error ? err.message : 'No se pudo eliminar la oferta'
       );
     }
   };
@@ -120,7 +120,7 @@ export function PromotionsScreen() {
             </Text>
           </View>
           <Button
-            title={tab === 'coupons' ? 'Nuevo cupón' : 'Nuevo banner'}
+            title={tab === 'coupons' ? 'Nuevo cupón' : 'Nueva oferta'}
             onPress={() =>
               tab === 'coupons'
                 ? navigation.navigate('CouponForm', {})
@@ -146,7 +146,7 @@ export function PromotionsScreen() {
           />
           <MetricCard
             variant="compact"
-            label="Banners"
+            label="Ofertas"
             value={formatNumber(offers.length)}
             icon="image"
             tone="info"
@@ -181,7 +181,7 @@ export function PromotionsScreen() {
             <Text
               style={[styles.tabText, tab === 'offers' && styles.tabTextActive]}
             >
-              Banners
+              Ofertas
             </Text>
           </TouchableOpacity>
         </View>
@@ -219,12 +219,12 @@ export function PromotionsScreen() {
           <View style={styles.empty}>
             <Feather name="image" size={40} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>
-              {searchQuery.trim() ? 'Sin resultados' : 'Sin banners'}
+              {searchQuery.trim() ? 'Sin resultados' : 'Sin ofertas'}
             </Text>
             <Text style={styles.emptyText}>
               {searchQuery.trim()
-                ? 'Ningún banner coincide con tu búsqueda.'
-                : 'Publica banners en el Home de la app. Puedes vincular un cupón opcional.'}
+                ? 'Ninguna oferta coincide con tu búsqueda.'
+                : 'Publica ofertas en el Home de la app: banner, cupón o platillo.'}
             </Text>
           </View>
         ) : (

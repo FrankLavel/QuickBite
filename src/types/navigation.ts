@@ -8,7 +8,6 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type AuthStackParamList = {
   Login: undefined;
-  Register: undefined;
 };
 
 /** Pantallas del portal (sidebar) */

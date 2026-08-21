@@ -40,6 +40,12 @@ export interface Restaurant {
   address: string;
   deliveryZone: number;
   isOpen: boolean;
+  /**
+   * Modo del estado abierto/cerrado:
+   *  - true / ausente = AUTOMÁTICO: respeta el horario (`schedule`).
+   *  - false = MANUAL: manda el interruptor `isOpen`, ignora el horario.
+   */
+  autoSchedule?: boolean;
   schedule?: WeekSchedule;
   /** La app cliente lee location como GeoPoint de Firestore. */
   location?: GeoPoint | { latitude: number; longitude: number } | null;
