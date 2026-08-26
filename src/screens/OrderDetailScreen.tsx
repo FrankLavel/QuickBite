@@ -26,7 +26,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   listenOrder,
-  claimOrder,
   pickUpOrder,
   markDelivered,
   getRestaurantInfo,
@@ -107,8 +106,6 @@ export function OrderDetailScreen() {
   }
 
   const mine = !!driver && order.driverId === driver.uid;
-  const available = order.status === ORDER_STATUS.READY && !order.driverId;
-  const takenByOther = !!order.driverId && !mine;
 
   const pickupCoords: Coords | null =
     restaurant?.lat != null && restaurant?.lng != null
@@ -129,14 +126,6 @@ export function OrderDetailScreen() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function onClaim() {
-    if (!driver) return;
-    void run(
-      () => claimOrder(order!.id, driver),
-      'No se pudo reclamar el pedido.'
-    );
   }
 
   function onPickUp() {
@@ -247,9 +236,7 @@ export function OrderDetailScreen() {
 
       {/* Acción principal */}
       <View style={styles.actionBar}>
-        {available ? (
-          <Button label="Reclamar pedido" onPress={onClaim} loading={busy} />
-        ) : mine && order.status === ORDER_STATUS.READY ? (
+        {mine && order.status === ORDER_STATUS.READY ? (
           <Button label="Recogí el pedido" onPress={onPickUp} loading={busy} />
         ) : mine && order.status === ORDER_STATUS.ON_THE_WAY ? (
           <>
@@ -274,8 +261,6 @@ export function OrderDetailScreen() {
           </>
         ) : mine && order.status === ORDER_STATUS.DELIVERED ? (
           <Text style={styles.doneText}>✅ Entrega completada</Text>
-        ) : takenByOther ? (
-          <Text style={styles.doneText}>Otro repartidor tomó este pedido</Text>
         ) : null}
       </View>
     </SafeAreaView>

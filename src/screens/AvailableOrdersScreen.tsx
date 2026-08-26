@@ -1,29 +1,45 @@
 /**
  * screens/AvailableOrdersScreen.tsx
- * Pedidos 'listos para recoger' sin repartidor. El repartidor puede abrir el
- * detalle y reclamarlos (modelo auto-servicio). Theme-aware.
+ * Pedidos disponibles (proyección redactada sin PII). El repartidor los reclama
+ * desde aquí; al lograrlo, abre el detalle ya con los datos completos.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OrderCard } from '../components/OrderCard';
+import { AvailableOrderCard } from '../components/AvailableOrderCard';
 import { EmptyState } from '../components/EmptyState';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { listenAvailableOrders } from '../services/deliveryService';
-import type { Order } from '../types/order';
+import { listenAvailableOrders, claimOrder } from '../services/deliveryService';
+import type { AvailableOrder } from '../types/availableOrder';
 import type { RootStackParamList } from '../navigation/types';
 import { spacing, type Colors } from '../utils/theme';
 
 export function AvailableOrdersScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { driver } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [orders, setOrders] = useState<AvailableOrder[] | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => listenAvailableOrders(setOrders), []);
+
+  async function onClaim(order: AvailableOrder) {
+    if (!driver || claimingId) return;
+    setClaimingId(order.orderId);
+    try {
+      await claimOrder(order.orderId, driver);
+      nav.navigate('OrderDetail', { orderId: order.orderId });
+    } catch (e) {
+      Alert.alert('No se pudo reclamar', (e as Error)?.message ?? 'Intenta con otro.');
+    } finally {
+      setClaimingId(null);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -34,13 +50,13 @@ export function AvailableOrdersScreen() {
       />
       <FlatList
         data={orders ?? []}
-        keyExtractor={(o) => o.id}
+        keyExtractor={(o) => o.orderId}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <OrderCard
+          <AvailableOrderCard
             order={item}
-            timeField={item.readyAt ?? item.createdAt}
-            onPress={() => nav.navigate('OrderDetail', { orderId: item.id })}
+            claiming={claimingId === item.orderId}
+            onClaim={() => onClaim(item)}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}

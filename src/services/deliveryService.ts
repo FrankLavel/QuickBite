@@ -1,8 +1,8 @@
 /**
  * services/deliveryService.ts
- * Lógica de reparto en modelo "auto-servicio": el repartidor ve los pedidos
- * 'ready' sin repartidor, reclama uno (transacción para evitar doble asignación),
- * lo recoge y lo marca como entregado.
+ * Lógica de reparto en modelo "auto-servicio": el repartidor ve una proyección
+ * REDACTADA de los pedidos disponibles (availableOrders, sin PII del cliente),
+ * reclama uno, y solo entonces lee el pedido completo para recogerlo/entregarlo.
  */
 import {
   collection,
@@ -12,40 +12,29 @@ import {
   doc,
   getDoc,
   updateDoc,
-  runTransaction,
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { COLLECTIONS, ORDER_STATUS } from '../utils/constants';
 import type { Order } from '../types/order';
+import type { AvailableOrder } from '../types/availableOrder';
 import type { DriverUser } from '../types/user';
 
 function mapOrder(id: string, data: Record<string, unknown>): Order {
   return { id, ...(data as Omit<Order, 'id'>) };
 }
 
-/** ¿El pedido está libre para reclamar? (ready y sin repartidor). */
-export function isAvailable(o: Order): boolean {
-  return o.status === ORDER_STATUS.READY && !o.driverId;
-}
-
 /**
- * Escucha en tiempo real los pedidos 'ready'. Filtra en cliente los que ya tienen
- * repartidor (Firestore no consulta bien la ausencia de un campo).
+ * Escucha en tiempo real los pedidos disponibles (proyección redactada sin PII).
+ * La colección solo contiene pedidos 'ready' sin repartidor (la mantiene una
+ * Cloud Function), así que no hace falta filtrar en cliente.
  */
 export function listenAvailableOrders(
-  cb: (orders: Order[]) => void
+  cb: (orders: AvailableOrder[]) => void
 ): Unsubscribe {
-  const q = query(
-    collection(db, COLLECTIONS.ORDERS),
-    where('status', '==', ORDER_STATUS.READY)
-  );
-  return onSnapshot(q, (snap) => {
-    const orders = snap.docs
-      .map((d) => mapOrder(d.id, d.data()))
-      .filter(isAvailable);
-    cb(orders);
+  return onSnapshot(collection(db, COLLECTIONS.AVAILABLE_ORDERS), (snap) => {
+    cb(snap.docs.map((d) => ({ ...(d.data() as AvailableOrder), orderId: d.id })));
   });
 }
 
@@ -70,28 +59,24 @@ export function isActiveDelivery(o: Order): boolean {
 }
 
 /**
- * Reclama un pedido disponible. Usa una transacción: relee el pedido y solo asigna
- * si sigue 'ready' y sin repartidor, evitando que dos repartidores lo tomen a la vez.
+ * Reclama un pedido disponible. Escribe solo driverId+assignedAt: la regla de
+ * Firestore exige que el pedido siga 'ready' y sin repartidor, así que si dos
+ * repartidores compiten, el segundo recibe permission-denied (no hace falta
+ * transacción ni leer el pedido, que aún no puede ver). El nombre/teléfono los
+ * denormaliza una Cloud Function desde el perfil real del repartidor.
  */
 export async function claimOrder(
   orderId: string,
   driver: DriverUser
 ): Promise<void> {
-  const ref = doc(db, COLLECTIONS.ORDERS, orderId);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) throw new Error('El pedido ya no existe.');
-    const data = snap.data() as Order;
-    if (data.status !== ORDER_STATUS.READY || data.driverId) {
-      throw new Error('Otro repartidor tomó este pedido.');
-    }
-    tx.update(ref, {
+  try {
+    await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
       driverId: driver.uid,
-      driverName: driver.name,
-      driverPhone: driver.phone ?? '',
       assignedAt: serverTimestamp(),
     });
-  });
+  } catch {
+    throw new Error('Otro repartidor tomó este pedido.');
+  }
 }
 
 /** Marca el pedido como recogido: 'ready' → 'on_the_way'. */

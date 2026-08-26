@@ -8,6 +8,8 @@ export const COLLECTIONS = {
   USERS: 'users',
   RESTAURANTS: 'restaurants',
   ORDERS: 'orders',
+  /** Proyección redactada de pedidos disponibles (sin PII), para repartidores. */
+  AVAILABLE_ORDERS: 'availableOrders',
 } as const;
 
 export const STORAGE_KEYS = {

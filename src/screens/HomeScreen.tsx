@@ -25,6 +25,7 @@ import { listenAvailableOrders, isActiveDelivery } from '../services/deliverySer
 import { computeStats } from '../utils/stats';
 import { formatCurrency } from '../utils/format';
 import type { Order } from '../types/order';
+import type { AvailableOrder } from '../types/availableOrder';
 import type { RootStackParamList } from '../navigation/types';
 import { radius, spacing, type Colors } from '../utils/theme';
 
@@ -41,7 +42,7 @@ export function HomeScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const myOrders = useMyOrders();
-  const [available, setAvailable] = useState<Order[]>([]);
+  const [available, setAvailable] = useState<AvailableOrder[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => listenAvailableOrders(setAvailable), []);
