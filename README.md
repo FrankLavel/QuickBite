@@ -72,6 +72,9 @@ npm start          # inicia Expo (elige web con la tecla w)
 npm run web        # abre directamente en el navegador
 npm run build:web  # exporta el sitio estático a dist/
 npm run deploy     # exporta + despliega a Firebase Hosting
+npm test           # ejecuta los tests (Jest)
+npm run typecheck  # verifica tipos (tsc --noEmit)
+npm run lint       # ESLint (expo lint)
 ```
 
 ## Despliegue
@@ -81,6 +84,11 @@ npm run deploy
 ```
 
 Sube el panel a Firebase Hosting (**https://quickbite-6dee7.web.app**). El `firebase.json` está configurado solo para *hosting*, para no tocar las reglas de Firestore (que se administran desde el repo móvil).
+
+## Documentación
+
+- **[`docs/`](docs/README.md)** — documentación técnica modular: [arquitectura](docs/architecture.md) (actual y objetivo v2.0), [modelo de datos](docs/database.md), [autenticación](docs/authentication.md), [API y servicios](docs/api.md), [despliegue y CI](docs/deployment.md) y [decisiones técnicas](docs/decisions.md).
+- **[`DOCUMENTACION.md`](DOCUMENTACION.md)** — documento académico exhaustivo (también en `.docx`).
 
 ## Notas
 
