@@ -9,7 +9,9 @@ rules_version = '2';
 //     el equipo del dashboard por fuera de estas reglas (Admin SDK/Cloud Function),
 //     para evitar que cualquiera se autoasigne un restaurantId. Una vez provisionado,
 //     administra su propio restaurante/menú/ofertas/cupones y el status de sus pedidos.
-// No existe rol de repartidor: el status 'on_the_way' lo asigna el propio restaurante.
+//   - 'driver' (app QuickBite Driver): NO se autoregistra (lo provisiona el admin,
+//     igual que 'restaurant'). En modelo auto-servicio reclama pedidos 'ready' sin
+//     repartidor y avanza su status: 'ready' -> 'on_the_way' -> 'delivered'.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,6 +33,11 @@ service cloud.firestore {
       return isSignedIn()
              && currentUserData().role == 'restaurant'
              && currentUserData().restaurantId == restId;
+    }
+
+    // El repartidor autenticado (rol 'driver', provisionado por el admin).
+    function isDriver() {
+      return isSignedIn() && currentUserData().role == 'driver';
     }
 
     // Compra verificada para reseñas: el pedido existe, es del usuario actual y
@@ -138,9 +145,13 @@ service cloud.firestore {
     // ---------- orders ----------
     match /orders/{orderId} {
       // El cliente dueño del pedido, o el restaurante que lo recibió, pueden leerlo.
+      // El repartidor ve los pedidos disponibles ('ready') y los que le pertenecen.
       allow read: if isSignedIn()
                   && (resource.data.customerId == request.auth.uid
-                      || isRestaurantOwner(resource.data.restaurantId));
+                      || isRestaurantOwner(resource.data.restaurantId)
+                      || (isDriver()
+                          && (resource.data.status == 'ready'
+                              || resource.data.get('driverId', '') == request.auth.uid)));
 
       // Crear: el customerId debe ser el usuario actual y el estado inicial
       // 'pending'. Además el cliente NO puede marcar el pedido como pagado: los
@@ -169,9 +180,56 @@ service cloud.firestore {
                       (isRestaurantOwner(resource.data.restaurantId)
                        && request.resource.data.diff(resource.data).affectedKeys()
                             .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason']))
+                      ||
+                      // Repartidor reclama un pedido disponible ('ready' y sin driver).
+                      (isDriver()
+                       && resource.data.status == 'ready'
+                       && resource.data.get('driverId', '') == ''
+                       && request.resource.data.driverId == request.auth.uid
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['driverId', 'driverName', 'driverPhone', 'assignedAt']))
+                      ||
+                      // Repartidor asignado marca recogido: 'ready' -> 'on_the_way'.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'ready'
+                       && request.resource.data.status == 'on_the_way'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'pickedUpAt']))
+                      ||
+                      // Repartidor asignado marca entregado: 'on_the_way' -> 'delivered'.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'on_the_way'
+                       && request.resource.data.status == 'delivered'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'deliveredAt']))
                     );
 
       allow delete: if false;
+    }
+
+    // ---------- deliveryTracking (ubicación en vivo del repartidor) ----------
+    // Un doc por pedido (id = orderId) con lat/lng/updatedAt. Solo existe mientras
+    // hay una entrega en curso; el repartidor lo borra al entregar (privacidad).
+    match /deliveryTracking/{orderId} {
+      function orderData() {
+        return get(/databases/$(database)/documents/orders/$(orderId)).data;
+      }
+
+      // Escribe el repartidor asignado a ese pedido (verificado contra el pedido).
+      allow create, update: if isDriver()
+                    && request.resource.data.driverId == request.auth.uid
+                    && orderData().driverId == request.auth.uid;
+
+      // Leen: el repartidor, el cliente dueño del pedido y el restaurante receptor.
+      allow read: if isSignedIn()
+                  && (resource.data.driverId == request.auth.uid
+                      || orderData().customerId == request.auth.uid
+                      || isRestaurantOwner(orderData().restaurantId));
+
+      // El repartidor asignado borra el rastro al completar la entrega.
+      allow delete: if isDriver() && orderData().driverId == request.auth.uid;
     }
   }
 }
