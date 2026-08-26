@@ -8,6 +8,7 @@ const { defineString, defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const openpay = require('./openpay');
+const webpush = require('web-push');
 
 initializeApp();
 const db = getFirestore();
@@ -25,6 +26,15 @@ const openpayCfg = () => ({
   merchantId: OPENPAY_MERCHANT_ID.value(),
   privateKey: OPENPAY_PRIVATE_KEY.value(),
   sandbox: OPENPAY_SANDBOX.value() !== 'false',
+});
+
+// --- Web Push (VAPID) para el dashboard del restaurante ----------------------
+// Las llaves viven en functions/.env (gitignored). Para producción conviene
+// mover VAPID_PRIVATE_KEY a Secret Manager.
+const VAPID_PUBLIC_KEY = defineString('VAPID_PUBLIC_KEY');
+const VAPID_PRIVATE_KEY = defineString('VAPID_PRIVATE_KEY');
+const VAPID_SUBJECT = defineString('VAPID_SUBJECT', {
+  default: 'mailto:no-reply@quickbite.app',
 });
 
 // Mensaje al cliente por cada estado (debe coincidir con lib/orderStatus.ts).
@@ -140,6 +150,53 @@ exports.notifyDriversOnReady = onDocumentUpdated('orders/{orderId}', async (even
   });
   if (!res.ok) {
     console.error('Expo push (drivers) falló', res.status, await res.text());
+  }
+});
+
+/**
+ * Al crear un pedido, avisa por Web Push al restaurante dueño (dashboard PWA),
+ * para alertarlo aunque tenga la pestaña cerrada. La suscripción se guarda en
+ * users/{uid}.webPushSubscription desde el dashboard.
+ */
+exports.notifyRestaurantOnNewOrder = onDocumentCreated('orders/{orderId}', async (event) => {
+  const order = event.data?.data();
+  if (!order || !order.restaurantId) return;
+
+  // Usuario dueño del restaurante (query por restaurantId, sin índice compuesto).
+  const snap = await db
+    .collection('users')
+    .where('restaurantId', '==', order.restaurantId)
+    .get();
+  const restUser = snap.docs.find((d) => d.get('role') === 'restaurant');
+  if (!restUser) return;
+
+  const sub = restUser.get('webPushSubscription');
+  if (!sub || !sub.endpoint) return;
+
+  const publicKey = VAPID_PUBLIC_KEY.value();
+  const privateKey = VAPID_PRIVATE_KEY.value();
+  if (!publicKey || !privateKey) {
+    console.warn('VAPID no configurado; no se envía Web Push.');
+    return;
+  }
+  webpush.setVapidDetails(VAPID_SUBJECT.value(), publicKey, privateKey);
+
+  const shortId = event.params.orderId.slice(0, 6).toUpperCase();
+  const payload = JSON.stringify({
+    title: 'Nuevo pedido',
+    body: `Tienes un pedido nuevo #${shortId}`,
+    data: { url: '/', orderId: event.params.orderId },
+  });
+
+  try {
+    await webpush.sendNotification(sub, payload);
+  } catch (err) {
+    // 404/410 = suscripción expirada: se limpia.
+    if (err && (err.statusCode === 404 || err.statusCode === 410)) {
+      await restUser.ref.update({ webPushSubscription: FieldValue.delete() });
+    } else {
+      console.error('Web Push falló', err?.statusCode, err?.body);
+    }
   }
 });
 

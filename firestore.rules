@@ -52,7 +52,7 @@ service cloud.firestore {
     // Solo estos campos del perfil puede editar el cliente (nunca role/restaurantId/email/createdAt).
     function onlyEditableUserFields() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken']);
+        .hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken', 'webPushSubscription']);
     }
 
     // ---------- users ----------
