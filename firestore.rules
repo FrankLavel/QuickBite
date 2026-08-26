@@ -145,13 +145,13 @@ service cloud.firestore {
     // ---------- orders ----------
     match /orders/{orderId} {
       // El cliente dueño del pedido, o el restaurante que lo recibió, pueden leerlo.
-      // El repartidor ve los pedidos disponibles ('ready') y los que le pertenecen.
+      // El repartidor SOLO lee los pedidos que le pertenecen (driverId == uid); los
+      // disponibles los ve por la proyección redactada availableOrders (sin PII).
       allow read: if isSignedIn()
                   && (resource.data.customerId == request.auth.uid
                       || isRestaurantOwner(resource.data.restaurantId)
                       || (isDriver()
-                          && (resource.data.status == 'ready'
-                              || resource.data.get('driverId', '') == request.auth.uid)));
+                          && resource.data.get('driverId', '') == request.auth.uid));
 
       // Crear: el customerId debe ser el usuario actual y el estado inicial
       // 'pending'. Además el cliente NO puede marcar el pedido como pagado: los
@@ -182,12 +182,14 @@ service cloud.firestore {
                             .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason']))
                       ||
                       // Repartidor reclama un pedido disponible ('ready' y sin driver).
+                      // Solo fija driverId+assignedAt; el nombre/teléfono los pone una
+                      // Cloud Function desde el perfil real del repartidor (H2).
                       (isDriver()
                        && resource.data.status == 'ready'
                        && resource.data.get('driverId', '') == ''
                        && request.resource.data.driverId == request.auth.uid
                        && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['driverId', 'driverName', 'driverPhone', 'assignedAt']))
+                            .hasOnly(['driverId', 'assignedAt']))
                       ||
                       // Repartidor asignado marca recogido: 'ready' -> 'on_the_way'.
                       (isDriver()
@@ -207,6 +209,14 @@ service cloud.firestore {
                     );
 
       allow delete: if false;
+    }
+
+    // ---------- availableOrders (proyección redactada para repartidores) ------
+    // Datos gruesos de los pedidos 'ready' sin repartidor (sin PII del cliente).
+    // La mantiene Cloud Functions (Admin SDK); los repartidores solo la leen.
+    match /availableOrders/{orderId} {
+      allow read: if isDriver();
+      allow write: if false;
     }
 
     // ---------- deliveryTracking (ubicación en vivo del repartidor) ----------

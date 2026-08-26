@@ -154,6 +154,65 @@ exports.notifyDriversOnReady = onDocumentUpdated('orders/{orderId}', async (even
 });
 
 /**
+ * Mantiene la proyección REDACTADA de pedidos disponibles para repartidores:
+ * availableOrders/{orderId} con datos gruesos (sin PII del cliente). Existe solo
+ * mientras el pedido está 'ready' y sin repartidor. Así el repartidor decide sin
+ * ver nombre/teléfono/dirección del cliente hasta que reclama el pedido (H1).
+ */
+exports.syncAvailableOrders = onDocumentWritten('orders/{orderId}', async (event) => {
+  const after = event.data?.after.data();
+  const orderId = event.params.orderId;
+  const availRef = db.collection('availableOrders').doc(orderId);
+
+  const isAvailable = !!after && after.status === 'ready' && !after.driverId;
+  if (!isAvailable) {
+    await availRef.delete().catch(() => {});
+    return;
+  }
+
+  let restaurantName = '';
+  try {
+    const r = await db.collection('restaurants').doc(after.restaurantId).get();
+    restaurantName = r.get('name') || '';
+  } catch (e) {
+    // sin nombre si no se pudo leer
+  }
+  const itemCount = Array.isArray(after.items)
+    ? after.items.reduce((n, it) => n + (Number(it.qty) || 0), 0)
+    : 0;
+
+  await availRef.set({
+    orderId,
+    restaurantId: after.restaurantId || '',
+    restaurantName,
+    city: (after.deliveryAddress && after.deliveryAddress.city) || '',
+    total: Number(after.total) || 0,
+    itemCount,
+    orderCreatedAt: after.createdAt || FieldValue.serverTimestamp(),
+  });
+});
+
+/**
+ * Al reclamar un pedido (driverId pasa de vacío a asignado), denormaliza el
+ * nombre y teléfono REALES del repartidor desde su perfil (H2): así el cliente y
+ * el restaurante ven datos de contacto verificados, no los que escriba el driver.
+ */
+exports.denormalizeDriverOnClaim = onDocumentUpdated('orders/{orderId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.driverId || !after.driverId) return; // solo en la transición de reclamo
+
+  const driverSnap = await db.collection('users').doc(after.driverId).get();
+  if (!driverSnap.exists) return;
+
+  await event.data.after.ref.update({
+    driverName: driverSnap.get('name') || 'Repartidor',
+    driverPhone: driverSnap.get('phone') || '',
+  });
+});
+
+/**
  * Al crear un pedido, avisa por Web Push al restaurante dueño (dashboard PWA),
  * para alertarlo aunque tenga la pestaña cerrada. La suscripción se guarda en
  * users/{uid}.webPushSubscription desde el dashboard.
