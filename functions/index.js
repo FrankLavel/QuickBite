@@ -99,6 +99,50 @@ exports.onOrderStatusChange = onDocumentUpdated('orders/{orderId}', async (event
 });
 
 /**
+ * Cuando un pedido pasa a 'ready' sin repartidor, avisa por push a los
+ * repartidores disponibles (rol 'driver', isAvailable != false y con pushToken)
+ * de que hay un pedido para reclamar. Modelo auto-servicio (app QuickBite Driver).
+ */
+exports.notifyDriversOnReady = onDocumentUpdated('orders/{orderId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after) return;
+  if (before.status === after.status) return; // solo en transiciones
+  if (after.status !== 'ready') return;
+  if (after.driverId) return; // ya tiene repartidor
+
+  const driversSnap = await db
+    .collection('users')
+    .where('role', '==', 'driver')
+    .get();
+
+  const tokens = driversSnap.docs
+    .filter((d) => d.get('isAvailable') !== false && d.get('pushToken'))
+    .map((d) => d.get('pushToken'));
+
+  if (tokens.length === 0) return;
+
+  const orderId = event.params.orderId;
+  const messages = tokens.map((token) => ({
+    to: token,
+    sound: 'default',
+    title: 'Nuevo pedido disponible',
+    body: 'Hay un pedido listo para recoger. ¡Reclámalo!',
+    data: { type: 'available_order', orderId },
+    channelId: 'default',
+  }));
+
+  const res = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(messages),
+  });
+  if (!res.ok) {
+    console.error('Expo push (drivers) falló', res.status, await res.text());
+  }
+});
+
+/**
  * Al crear un usuario CLIENTE: notificación de bienvenida (categoría "Sistema").
  */
 exports.onUserCreated = onDocumentCreated('users/{uid}', async (event) => {
