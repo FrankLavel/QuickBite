@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, Dimensions, ActivityIndicator, DimensionValue } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { PROVIDER_GOOGLE, Marker, Region } from 'react-native-maps';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { palette } from '@/constants/colors';
 import { ordersService } from '@/services/orders.service';
 import { restaurantsService } from '@/services/restaurants.service';
-import { Order, OrderStatus } from '@/types/order.types';
+import { DeliveryTracking, Order, OrderStatus } from '@/types/order.types';
 import { Restaurant } from '@/types/restaurant.types';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -41,6 +42,26 @@ function stepIndex(status: OrderStatus): number {
   }
 }
 
+type LatLng = { lat: number; lng: number };
+
+/** Región del mapa que encuadra al repartidor y (si existe) el destino. */
+function mapRegion(driver: DeliveryTracking, dest?: LatLng): Region {
+  if (!dest) {
+    return {
+      latitude: driver.lat,
+      longitude: driver.lng,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+  }
+  return {
+    latitude: (driver.lat + dest.lat) / 2,
+    longitude: (driver.lng + dest.lng) / 2,
+    latitudeDelta: Math.max(0.008, Math.abs(driver.lat - dest.lat) * 2.4),
+    longitudeDelta: Math.max(0.008, Math.abs(driver.lng - dest.lng) * 2.4),
+  };
+}
+
 export default function TrackingScreen() {
   const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
@@ -72,6 +93,16 @@ export default function TrackingScreen() {
     if (!order?.restaurantId) return;
     restaurantsService.getById(order.restaurantId).then(setRestaurant);
   }, [order?.restaurantId]);
+
+  // Ubicación en vivo del repartidor (solo mientras el pedido va en camino).
+  const [tracking, setTracking] = useState<DeliveryTracking | null>(null);
+  useEffect(() => {
+    if (!orderId || order?.status !== 'on_the_way') {
+      setTracking(null);
+      return;
+    }
+    return ordersService.listenTracking(orderId, setTracking);
+  }, [orderId, order?.status]);
 
   const submitRating = async (value: number) => {
     if (!orderId || submittingRating) return;
@@ -142,12 +173,43 @@ export default function TrackingScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      {/* Hero (portada del restaurante, sin mapa según el modelo) */}
+      {/* Hero: mapa en vivo mientras el repartidor va en camino; si no, portada. */}
       <View style={{ height: SCREEN_HEIGHT * 0.4 }} className="relative bg-surface-container">
-        {restaurant?.coverImage && (
-          <Image source={{ uri: restaurant.coverImage }} className="w-full h-full" resizeMode="cover" />
+        {order.status === 'on_the_way' && tracking ? (
+          <>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={{ flex: 1 }}
+              region={mapRegion(tracking, order.deliveryAddress?.coords)}
+            >
+              <Marker
+                coordinate={{ latitude: tracking.lat, longitude: tracking.lng }}
+                title={t('tracking.driverHere')}
+                pinColor={palette.primary}
+              />
+              {order.deliveryAddress?.coords && (
+                <Marker
+                  coordinate={{
+                    latitude: order.deliveryAddress.coords.lat,
+                    longitude: order.deliveryAddress.coords.lng,
+                  }}
+                  title={t('tracking.destHere')}
+                />
+              )}
+            </MapView>
+            <View className="absolute top-4 right-4 flex-row items-center gap-1.5 bg-black/60 rounded-full px-3 py-1.5">
+              <View className="w-2 h-2 rounded-full bg-primary" />
+              <Text className="text-white text-xs font-bold">{t('tracking.live')}</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            {restaurant?.coverImage && (
+              <Image source={{ uri: restaurant.coverImage }} className="w-full h-full" resizeMode="cover" />
+            )}
+            <View className="absolute inset-0 bg-black/30" />
+          </>
         )}
-        <View className="absolute inset-0 bg-black/30" />
       </View>
 
       <SafeAreaView edges={['top']} className="absolute top-0 left-0">

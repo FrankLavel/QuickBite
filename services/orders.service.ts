@@ -13,7 +13,7 @@ import {
   writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
-import { NewOrderInput, Order } from '@/types/order.types';
+import { DeliveryTracking, NewOrderInput, Order } from '@/types/order.types';
 
 const ordersCol = () => collection(db, 'orders');
 const orderRef = (orderId: string) => doc(db, 'orders', orderId);
@@ -121,6 +121,15 @@ export const ordersService = {
   ): Unsubscribe =>
     onSnapshot(orderRef(orderId), (snap) =>
       onChange(snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null)
+    ),
+
+  /** Escucha la ubicación en vivo del repartidor (deliveryTracking/{orderId}). */
+  listenTracking: (
+    orderId: string,
+    onChange: (tracking: DeliveryTracking | null) => void
+  ): Unsubscribe =>
+    onSnapshot(doc(db, 'deliveryTracking', orderId), (snap) =>
+      onChange(snap.exists() ? (snap.data() as DeliveryTracking) : null)
     ),
 
   /** Única escritura de UPDATE permitida al cliente: la calificación. */
