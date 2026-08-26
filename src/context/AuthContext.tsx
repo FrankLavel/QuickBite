@@ -13,6 +13,7 @@ import React, {
 } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { subscribeWebPush } from '../utils/webPush';
 import {
   loginRestaurant,
   registerRestaurant,
@@ -116,6 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return unsubscribe;
   }, []);
+
+  // Al haber restaurante autenticado (en web), suscribe el dashboard a Web Push
+  // para recibir avisos de pedidos nuevos con la pestaña cerrada.
+  useEffect(() => {
+    if (user?.uid) void subscribeWebPush(user.uid);
+  }, [user?.uid]);
 
   const login = useCallback(
     async (email: string, password: string, remember = true) => {
