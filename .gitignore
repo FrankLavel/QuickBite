@@ -19,3 +19,6 @@ firebase.config.ts
 
 # TypeScript
 *.tsbuildinfo
+
+# Tests
+coverage/
