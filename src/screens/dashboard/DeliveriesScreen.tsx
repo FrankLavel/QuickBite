@@ -1,8 +1,11 @@
 /**
  * screens/dashboard/DeliveriesScreen.tsx
  * Gestión de entregas — "board" profesional: filtros por estado, KPIs
- * operativos y tarjetas de entrega accionables. No hay entidad repartidor:
- * el restaurante marca "en camino" / "entregado".
+ * operativos y tarjetas de entrega accionables.
+ *
+ * Reparto (app QuickBite Driver): si un repartidor reclamó el pedido (driverId),
+ * el restaurante ve quién lo lleva y en qué estado, y NO lo avanza a mano (lo hace
+ * el repartidor). Si no hay repartidor, se mantiene el avance manual como respaldo.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -21,6 +24,7 @@ import { MetricCard } from '../../components/MetricCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/Button';
 import { UserAvatar } from '../../components/UserAvatar';
+import { LiveTrackingModal } from '../../components/LiveTrackingModal';
 import { useOrders } from '../../hooks/useOrders';
 import { ORDER_STATUS } from '../../utils/constants';
 import type { Order, OrderStatus } from '../../types/order';
@@ -92,7 +96,9 @@ export function DeliveriesScreen() {
     const deliveredToday = delivered.filter(
       (o) => isToday(o.deliveredAt) || isToday(o.createdAt)
     ).length;
-    return { waiting, enRoute, delivered, deliveredToday };
+    // Entregas activas que ya tomó un repartidor (esperando recogida o en camino).
+    const withDriver = [...waiting, ...enRoute].filter((o) => !!o.driverId).length;
+    return { waiting, enRoute, delivered, deliveredToday, withDriver };
   }, [orders]);
 
   const list = useMemo(() => {
@@ -177,6 +183,14 @@ export function DeliveriesScreen() {
             badgeTone="live"
           />
           <MetricCard
+            label="Con repartidor"
+            value={String(groups.withDriver)}
+            icon="user-check"
+            tone="info"
+            badge={groups.withDriver > 0 ? 'Driver' : undefined}
+            badgeTone="live"
+          />
+          <MetricCard
             label="Entregadas hoy"
             value={String(groups.deliveredToday)}
             icon="check-circle"
@@ -246,8 +260,8 @@ function DeliveryCard({
   const accent = STATUS_ACCENT[order.status] ?? colors.border;
   const customer =
     order.customerName ?? `Cliente ${order.customerId.slice(0, 6)}`;
+  const hasDriver = !!order.driverId;
   const isDelivered = order.status === ORDER_STATUS.DELIVERED;
-  const timeRef = isDelivered ? order.deliveredAt : order.createdAt;
   const timeLabel = isDelivered
     ? `Entregado ${relTime(order.deliveredAt) || 'recientemente'}`
     : `Pedido ${relTime(order.createdAt) || 'reciente'}`;
@@ -313,7 +327,9 @@ function DeliveryCard({
 
       <View style={styles.grow} />
 
-      {actionLabel ? (
+      {hasDriver ? (
+        <DriverPanel order={order} />
+      ) : actionLabel ? (
         <Button title={actionLabel} onPress={onAdvance} style={styles.btn} />
       ) : (
         <View style={styles.doneRow}>
@@ -321,6 +337,62 @@ function DeliveryCard({
           <Text style={styles.doneText}>Entrega completada</Text>
         </View>
       )}
+    </View>
+  );
+}
+
+/** Panel del repartidor asignado: quién lleva el pedido, su estado y seguimiento. */
+function DriverPanel({ order }: { order: Order }) {
+  const [tracking, setTracking] = useState(false);
+  const onTheWay = order.status === ORDER_STATUS.ON_THE_WAY;
+  const tone =
+    order.status === ORDER_STATUS.DELIVERED
+      ? colors.success
+      : onTheWay
+        ? colors.info
+        : colors.warning;
+  const statusText =
+    order.status === ORDER_STATUS.DELIVERED
+      ? 'Entregó el pedido'
+      : onTheWay
+        ? 'En camino'
+        : 'Asignado · esperando recogida';
+
+  return (
+    <View style={[styles.driverPanel, { borderColor: `${tone}55` }]}>
+      <View style={styles.driverHead}>
+        <Feather name="user" size={13} color={tone} />
+        <Text style={styles.driverName} numberOfLines={1}>
+          {order.driverName ?? 'Repartidor'}
+        </Text>
+        {order.driverPhone ? (
+          <View style={styles.inlineRow}>
+            <Feather name="phone" size={11} color={colors.primary} />
+            <Text style={styles.phone}>{order.driverPhone}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.driverFoot}>
+        <Text style={[styles.driverStatus, { color: tone }]}>{statusText}</Text>
+        {onTheWay ? (
+          <TouchableOpacity
+            style={styles.trackBtn}
+            onPress={() => setTracking(true)}
+          >
+            <Feather name="map-pin" size={12} color={colors.info} />
+            <Text style={styles.trackBtnText}>Seguir en vivo</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {onTheWay ? (
+        <LiveTrackingModal
+          orderId={order.id}
+          driverName={order.driverName}
+          visible={tracking}
+          onClose={() => setTracking(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -442,6 +514,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   btn: { marginTop: spacing.md },
+  driverPanel: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.sm,
+    gap: 4,
+  },
+  driverHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  driverName: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  driverFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  driverStatus: {
+    ...typography.caption,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  trackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.info,
+  },
+  trackBtnText: {
+    ...typography.caption,
+    color: colors.info,
+    fontWeight: '800',
+  },
   doneRow: {
     flexDirection: 'row',
     alignItems: 'center',

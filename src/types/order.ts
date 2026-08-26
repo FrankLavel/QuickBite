@@ -67,4 +67,10 @@ export interface Order {
   /** Denormalizados en el pedido por la app cliente (para mostrar/contactar). */
   customerName?: string;
   customerPhone?: string;
+  /** Reparto (los escribe la app QuickBite Driver al reclamar/avanzar). */
+  driverId?: string;
+  driverName?: string;
+  driverPhone?: string;
+  assignedAt?: unknown;
+  pickedUpAt?: unknown;
 }
