@@ -35,6 +35,7 @@ const STATUS_MESSAGE = {
   on_the_way: 'Tu pedido está en camino',
   delivered: 'Pedido entregado — califica tu pedido',
   rejected: 'Tu pedido fue rechazado',
+  cancelled: 'Cancelaste este pedido',
 };
 
 /**
