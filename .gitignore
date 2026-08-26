@@ -1,0 +1,21 @@
+node_modules/
+.expo/
+dist/
+web-build/
+npm-debug.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.env
+.env.local
+firebase.config.ts
+
+# macOS
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo

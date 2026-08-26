@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "QuickBite Driver",
+    "slug": "quickbite-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "quickbitedriver",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#2caf4b"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "QuickBite Driver usa tu ubicación para compartir en tiempo real dónde vas durante una entrega activa."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2caf4b"
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.quickbite.driver"
+    },
+    "android": {
+      "package": "com.quickbite.driver",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
