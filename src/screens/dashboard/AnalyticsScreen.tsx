@@ -225,6 +225,40 @@ export function AnalyticsScreen() {
 
     const topOrders = [...current].sort((a, b) => b.total - a.total).slice(0, 5);
 
+    // Tiempo promedio de entrega (creación → entregado), en minutos.
+    const deliveryTimes = deliveredCur
+      .map((o) => {
+        const c = toDateSafe(o.createdAt);
+        const del = toDateSafe(o.deliveredAt);
+        return c && del ? (del.getTime() - c.getTime()) / 60000 : null;
+      })
+      .filter((n): n is number => n != null && n >= 0);
+    const avgDeliveryMin =
+      deliveryTimes.length > 0
+        ? deliveryTimes.reduce((s, n) => s + n, 0) / deliveryTimes.length
+        : 0;
+
+    // Cancelaciones: pedidos cancelados por el cliente o rechazados por el local.
+    const cancelledCount = current.filter(
+      (o) => o.status === 'cancelled' || o.status === 'rejected'
+    ).length;
+    const cancelledPct =
+      current.length > 0 ? (cancelledCount / current.length) * 100 : 0;
+
+    // Clientes nuevos: su PRIMER pedido (de todo el historial) cae en el periodo.
+    const firstOrderAt = new Map<string, number>();
+    orders.forEach((o) => {
+      const id = o.customerId || 'desconocido';
+      const t = toDateSafe(o.createdAt)?.getTime();
+      if (t == null) return;
+      const prev = firstOrderAt.get(id);
+      if (prev == null || t < prev) firstOrderAt.set(id, t);
+    });
+    const periodStart = now.getTime() - period * 86_400_000;
+    const newCustomers = Array.from(firstOrderAt.values()).filter(
+      (t) => t >= periodStart
+    ).length;
+
     return {
       revenue,
       totalOrders: current.length,
@@ -241,6 +275,10 @@ export function AnalyticsScreen() {
       returningPct,
       onlinePct,
       topOrders,
+      avgDeliveryMin,
+      cancelledCount,
+      cancelledPct,
+      newCustomers,
     };
   }, [orders, products, period]);
 
@@ -251,7 +289,7 @@ export function AnalyticsScreen() {
 
   /** Exporta el reporte del periodo: KPIs, serie de ingresos y más vendidos. */
   const exportReport = () => {
-    const rows: Array<Array<string | number>> = [
+    const rows: (string | number)[][] = [
       ['Reporte QuickBite', `Últimos ${period} días`],
       [],
       ['Indicador', 'Valor'],
@@ -259,6 +297,10 @@ export function AnalyticsScreen() {
       ['Pedidos totales', data.totalOrders],
       ['Ticket promedio', data.avg.toFixed(2)],
       ['Eficiencia (%)', data.efficiency.toFixed(0)],
+      ['Tiempo promedio de entrega (min)', data.avgDeliveryMin.toFixed(0)],
+      ['Cancelados/rechazados', data.cancelledCount],
+      ['Cancelados (%)', data.cancelledPct.toFixed(1)],
+      ['Clientes nuevos', data.newCustomers],
       ['Clientes recurrentes (%)', data.returningPct.toFixed(1)],
       ['Pago en línea (%)', data.onlinePct.toFixed(1)],
       [],
@@ -271,6 +313,54 @@ export function AnalyticsScreen() {
       ...data.bestSellers.map((b) => [b.name, b.qty, b.revenue.toFixed(2)]),
     ];
     downloadCsv(`analiticas-${period}d-${fileDateStamp()}`, rows);
+  };
+
+  /**
+   * Exporta un dataset PLANO (una fila por pedido) para modelar en Power BI:
+   * Get Data → Texto/CSV → construir tus propios visuales sobre esta tabla de hechos.
+   */
+  const exportPowerBI = () => {
+    const now = new Date();
+    const rows: (string | number)[][] = [
+      [
+        'orderId',
+        'fecha',
+        'estado',
+        'metodoPago',
+        'estadoPago',
+        'total',
+        'subtotal',
+        'envio',
+        'descuento',
+        'articulos',
+        'clienteId',
+        'cancelado',
+        'minutosEntrega',
+      ],
+    ];
+    orders.forEach((o) => {
+      const c = toDateSafe(o.createdAt);
+      if (!c || daysAgo(c, now) > period - 1) return;
+      const del = toDateSafe(o.deliveredAt);
+      const mins = del ? Math.round((del.getTime() - c.getTime()) / 60000) : '';
+      const items = (o.items ?? []).reduce((n, i) => n + (i.qty || 0), 0);
+      rows.push([
+        o.id,
+        c.toISOString(),
+        o.status,
+        o.paymentMethod,
+        o.paymentStatus,
+        (o.total ?? 0).toFixed(2),
+        (o.subtotal ?? 0).toFixed(2),
+        (o.deliveryFee ?? 0).toFixed(2),
+        (o.discount ?? 0).toFixed(2),
+        items,
+        o.customerId ?? '',
+        o.status === 'cancelled' || o.status === 'rejected' ? 1 : 0,
+        mins,
+      ]);
+    });
+    downloadCsv(`quickbite-pedidos-powerbi-${fileDateStamp()}`, rows);
   };
 
   const periods: [Period, string][] = [
@@ -321,6 +411,11 @@ export function AnalyticsScreen() {
               variant="outline"
               onPress={exportReport}
             />
+            <Button
+              title="Power BI"
+              variant="outline"
+              onPress={exportPowerBI}
+            />
           </View>
         </View>
 
@@ -357,6 +452,31 @@ export function AnalyticsScreen() {
             badge={data.efficiency >= 90 ? 'Optimizado' : undefined}
             badgeTone="up"
             hint="Entregados / total"
+          />
+          <MetricCard
+            label="Tiempo de entrega"
+            value={
+              data.avgDeliveryMin > 0
+                ? `${Math.round(data.avgDeliveryMin)} min`
+                : '—'
+            }
+            icon="clock"
+            tone="info"
+            hint="Promedio: creación → entrega"
+          />
+          <MetricCard
+            label="Cancelados"
+            value={formatNumber(data.cancelledCount)}
+            icon="x-circle"
+            tone="warning"
+            hint={`${formatPercent(data.cancelledPct, 0)} del total`}
+          />
+          <MetricCard
+            label="Clientes nuevos"
+            value={formatNumber(data.newCustomers)}
+            icon="user-plus"
+            tone="primary"
+            hint="Primer pedido en el periodo"
           />
         </View>
 
