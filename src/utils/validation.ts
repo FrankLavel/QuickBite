@@ -65,7 +65,7 @@ export function getFirestorePermissionMessage(): string {
 
 /** Extrae mensaje útil de errores de Firebase u otros */
 export function getErrorMessage(error: unknown): string {
-  const err = error as { code?: string; message?: string };
+  const err = (error ?? {}) as { code?: string; message?: string };
   const message =
     error instanceof Error ? error.message : (err.message ?? '');
 

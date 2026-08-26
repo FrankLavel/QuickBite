@@ -318,7 +318,7 @@ export function ProductFormScreen({
               </View>
             ) : (
               <Text style={styles.mutedNote}>
-                Sin extras. Agrega opciones como "Queso extra" o "Doble carne".
+                Sin extras. Agrega opciones como “Queso extra” o “Doble carne”.
               </Text>
             )}
             <View style={styles.toppingAddRow}>
@@ -436,7 +436,7 @@ export function ProductFormScreen({
               </View>
             ) : (
               <Text style={styles.mutedNote}>
-                Sin etiquetas. Ej. "picante", "vegetariano".
+                Sin etiquetas. Ej. “picante”, “vegetariano”.
               </Text>
             )}
             <View style={styles.tagAddRow}>
