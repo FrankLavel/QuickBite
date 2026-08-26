@@ -19,6 +19,7 @@ por separado.
 | [authentication.md](authentication.md) | Autenticación, roles, sesión, aprovisionamiento de cuentas de restaurante. |
 | [api.md](api.md) | Superficie de "API": Cloud Functions (callable/HTTP/trigger) y la capa de servicios del dashboard. |
 | [deployment.md](deployment.md) | Despliegue (Firebase Hosting), reglas/funciones, variables de entorno e integración continua (CI). |
+| [security.md](security.md) | Auditoría del modelo de seguridad: autorización por rol, verificaciones y hallazgos. |
 | [decisions.md](decisions.md) | Registro de decisiones técnicas (ADR): qué se eligió y **por qué**. |
 
 ## Ecosistema
