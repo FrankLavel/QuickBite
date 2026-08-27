@@ -1,6 +1,6 @@
 name: CI
 
-# Valida cada push a main y cada pull request: tipos y tests.
+# Valida cada push a main y cada pull request: salud de dependencias, tipos y tests.
 on:
   push:
     branches: [main]
@@ -8,7 +8,7 @@ on:
 
 jobs:
   quality:
-    name: Typecheck · Tests
+    name: Doctor · Typecheck · Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -28,6 +28,11 @@ jobs:
       # Las API keys web de Firebase son públicas por diseño (no son secretos).
       - name: Generar firebase.config.ts desde el example
         run: cp firebase.config.example.ts firebase.config.ts
+
+      # Detecta desajustes de versiones de paquetes Expo (p. ej. expo-font fuera
+      # del rango del SDK), que provocan crashes nativos al arrancar.
+      - name: Expo Doctor
+        run: npx --yes expo-doctor@latest
 
       - name: Typecheck
         run: npm run typecheck

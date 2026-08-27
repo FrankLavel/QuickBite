@@ -2,6 +2,10 @@ node_modules/
 .expo/
 dist/
 web-build/
+
+# Carpetas nativas generadas por prebuild (CNG). Se regeneran con expo run:android.
+/android/
+/ios/
 npm-debug.*
 *.jks
 *.keystore

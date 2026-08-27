@@ -10,7 +10,9 @@
     "splash": {
       "backgroundColor": "#2caf4b"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       [
         "expo-location",
@@ -23,7 +25,8 @@
         {
           "color": "#2caf4b"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
