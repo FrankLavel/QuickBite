@@ -6,6 +6,7 @@
 import type { Order } from '../types/order';
 import { ORDER_STATUS } from './constants';
 import { toDate } from './format';
+import { deliveryEarning } from './earnings';
 
 export interface DriverStats {
   todayCount: number;
@@ -48,7 +49,7 @@ export function computeStats(orders: Order[], now = new Date()): DriverStats {
     if (active.has(o.status)) stats.activeCount += 1;
     if (o.status !== ORDER_STATUS.DELIVERED) continue;
 
-    const fee = o.deliveryFee || 0;
+    const fee = deliveryEarning(o);
     stats.totalCount += 1;
     stats.totalEarnings += fee;
 

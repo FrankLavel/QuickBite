@@ -95,6 +95,17 @@ export async function markDelivered(orderId: string): Promise<void> {
   });
 }
 
+/** Marca como liquidados (pagados al repartidor) los pedidos indicados. */
+export async function markDriverSettled(orderIds: string[]): Promise<void> {
+  await Promise.all(
+    orderIds.map((id) =>
+      updateDoc(doc(db, COLLECTIONS.ORDERS, id), {
+        driverSettledAt: serverTimestamp(),
+      })
+    )
+  );
+}
+
 /** Escucha en tiempo real un pedido concreto (para la pantalla de detalle). */
 export function listenOrder(
   orderId: string,

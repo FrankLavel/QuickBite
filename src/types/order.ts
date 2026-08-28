@@ -55,6 +55,10 @@ export interface Order {
   driverPhone?: string;
   assignedAt?: unknown;
   pickedUpAt?: unknown;
+  /** Propina para el repartidor (la elige el cliente en el checkout). */
+  tip?: number;
+  /** Momento en que la plataforma liquidó (pagó) este pedido al repartidor. */
+  driverSettledAt?: unknown;
 
   estimatedTime?: number;
   createdAt?: unknown;
