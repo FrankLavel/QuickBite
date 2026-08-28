@@ -118,7 +118,7 @@ export type NewOrderInput = Pick<
   | 'paymentMethod'
   | 'couponCode'
 > &
-  Partial<Pick<Order, 'specialInstructions' | 'customerName' | 'customerPhone'>>;
+  Partial<Pick<Order, 'specialInstructions' | 'customerName' | 'customerPhone' | 'tip'>>;
 
 /**
  * Estado local del carrito (antes del checkout). No es una colección de

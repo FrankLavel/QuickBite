@@ -287,6 +287,9 @@ const es: Record<string, string> = {
   // Checkout
   'checkout.emptyCart': 'Tu carrito está vacío.',
   'checkout.paymentMethod': 'Método de pago',
+  'checkout.tip': 'Propina',
+  'checkout.tipSub': 'Para tu repartidor. Se paga en efectivo al recibir.',
+  'checkout.tipNone': 'Sin propina',
   'checkout.card': 'Tarjeta de crédito o débito',
   'checkout.cardSub': 'Pago con tarjeta',
   'checkout.paypal': 'PayPal',
@@ -775,6 +778,9 @@ const en: Record<string, string> = {
   // Checkout
   'checkout.emptyCart': 'Your cart is empty.',
   'checkout.paymentMethod': 'Payment Method',
+  'checkout.tip': 'Tip',
+  'checkout.tipSub': 'For your courier. Paid in cash on delivery.',
+  'checkout.tipNone': 'No tip',
   'checkout.card': 'Credit or Debit Card',
   'checkout.cardSub': 'Pay with card',
   'checkout.paypal': 'PayPal',

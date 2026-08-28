@@ -56,6 +56,7 @@ export default function CheckoutScreen() {
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [payment, setPayment] = useState<PaymentMethod>('card');
+  const [tip, setTip] = useState(0);
   const [instructions, setInstructions] = useState('');
   const [placing, setPlacing] = useState(false);
   const [addressSheetVisible, setAddressSheetVisible] = useState(false);
@@ -78,6 +79,8 @@ export default function CheckoutScreen() {
   const discount =
     coupon && subtotal >= coupon.minOrder ? couponDiscount(coupon, subtotal) : 0;
   const total = Math.max(0, subtotal + deliveryFee - discount);
+  // Monto a pagar: el total del pedido + la propina (solo en efectivo).
+  const payTotal = total + (payment === 'cash' ? tip : 0);
 
   const defaultAddress =
     user?.addresses?.find((a) => a.isDefault) ?? user?.addresses?.[0] ?? null;
@@ -137,6 +140,8 @@ export default function CheckoutScreen() {
         coords: defaultAddress.coords,
       },
       paymentMethod: payment,
+      // Propina solo en efectivo (se paga en mano al repartidor, no se cobra a tarjeta).
+      ...(payment === 'cash' && tip > 0 ? { tip } : {}),
       // Solo registra/gasta el cupón si realmente aplicó un descuento (> 0).
       couponCode: coupon && discount > 0 ? coupon.code : null,
       ...(instructions.trim() ? { specialInstructions: instructions.trim() } : {}),
@@ -420,6 +425,32 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
+        {/* Tip (solo efectivo: se paga en mano al repartidor) */}
+        {payment === 'cash' && (
+          <View className="bg-surface-container-lowest rounded-xl p-6 gap-3" style={cardShadow}>
+            <Text className="text-xl font-bold text-on-surface">{t('checkout.tip')}</Text>
+            <Text className="text-sm text-on-surface-variant">{t('checkout.tipSub')}</Text>
+            <View className="flex-row gap-2">
+              {[0, 10, 20, 30].map((amount) => {
+                const isOn = tip === amount;
+                return (
+                  <TouchableOpacity
+                    key={amount}
+                    onPress={() => setTip(amount)}
+                    className={`flex-1 items-center py-3 border rounded-xl ${
+                      isOn ? 'border-primary bg-primary/10' : 'border-outline-variant'
+                    }`}
+                  >
+                    <Text className={`text-sm font-bold ${isOn ? 'text-primary' : 'text-on-surface'}`}>
+                      {amount === 0 ? t('checkout.tipNone') : `$${amount}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* Delivery instructions */}
         <View className="bg-surface-container-lowest rounded-xl p-6 gap-3" style={cardShadow}>
           <Text className="text-xl font-bold text-on-surface">{t('checkout.instructions')}</Text>
@@ -499,9 +530,15 @@ export default function CheckoutScreen() {
                 <Text className="text-sm font-semibold text-primary">-${discount.toFixed(2)}</Text>
               </View>
             )}
+            {payment === 'cash' && tip > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm font-semibold text-on-surface-variant">{t('checkout.tip')}</Text>
+                <Text className="text-sm font-semibold text-on-surface-variant">${tip.toFixed(2)}</Text>
+              </View>
+            )}
             <View className="flex-row justify-between pt-4 mt-2 border-t border-outline-variant">
               <Text className="text-xl font-bold text-on-surface">{t('cart.total')}</Text>
-              <Text className="text-xl font-bold text-on-surface">${total.toFixed(2)}</Text>
+              <Text className="text-xl font-bold text-on-surface">${payTotal.toFixed(2)}</Text>
             </View>
           </View>
 
