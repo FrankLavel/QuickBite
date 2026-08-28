@@ -206,6 +206,13 @@ service cloud.firestore {
                        && request.resource.data.status == 'delivered'
                        && request.resource.data.diff(resource.data).affectedKeys()
                             .hasOnly(['status', 'deliveredAt']))
+                      ||
+                      // Repartidor marca liquidado su propio pedido ya entregado.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'delivered'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['driverSettledAt']))
                     );
 
       allow delete: if false;

@@ -67,6 +67,8 @@ export interface Order {
   deliveryFee: number;
   discount: number;
   total: number;
+  /** Propina para el repartidor (opcional, la elige el cliente en el checkout). */
+  tip?: number;
   deliveryAddress: OrderDeliveryAddress;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
