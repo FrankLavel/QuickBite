@@ -10,7 +10,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { usersService } from '@/services/users.service';
 import { restaurantsService } from '@/services/restaurants.service';
-import { ordersService } from '@/services/orders.service';
 import {
   paymentsService,
   OpenpayToken,
@@ -69,6 +68,8 @@ export default function CheckoutScreen() {
   // Id de pedido estable para el pago con tarjeta: se conserva entre reintentos
   // del mismo checkout (idempotencia anti-doble-cobro) y se reinicia al concretar.
   const cardOrderId = useRef<string | null>(null);
+  // Id estable para el pedido en efectivo (idempotencia entre reintentos).
+  const cashOrderId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -200,18 +201,23 @@ export default function CheckoutScreen() {
       return;
     }
 
-    // Efectivo / PayPal: se crea el pedido directamente (paymentStatus 'pending').
+    // Efectivo: el pedido lo crea una Cloud Function que recalcula los montos y
+    // consume el cupón en el servidor (el cliente ya no escribe el pedido).
     const input = buildOrderInput();
     if (!input) return;
+    if (!cashOrderId.current) cashOrderId.current = newOrderId();
 
     setPlacing(true);
     try {
-      const orderId = await ordersService.createOrder(input);
+      const orderId = await paymentsService.createCashOrder(input, cashOrderId.current);
+      cashOrderId.current = null; // éxito: el próximo pedido usa un id nuevo.
       clearCart();
       router.replace(`/confirmation?orderId=${orderId}`);
-    } catch {
+    } catch (e) {
       setPlacing(false);
-      void showAlert({ title: t('common.error'), message: t('checkout.errorMsg') });
+      const message =
+        e instanceof Error && e.message ? e.message : t('checkout.errorMsg');
+      void showAlert({ title: t('common.error'), message });
     }
   };
 

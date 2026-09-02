@@ -37,6 +37,11 @@ const createCardChargeFn = httpsCallable<
   CreateCardChargeResult
 >(functions, 'createCardCharge');
 
+const createCashOrderFn = httpsCallable<
+  { orderInput: NewOrderInput; orderId: string },
+  { orderId: string }
+>(functions, 'createCashOrder');
+
 const saveCardFn = httpsCallable<
   { tokenId: string; deviceSessionId: string },
   { cardId: string; brand: string | null; last4: string | null }
@@ -68,6 +73,19 @@ export const paymentsService = {
       ...(payload.saveCard ? { saveCard: true } : {}),
       ...(payload.savedCardId ? { savedCardId: payload.savedCardId } : {}),
     });
+    return data.orderId;
+  },
+
+  /**
+   * Crea un pedido en efectivo vía la Cloud Function, que recalcula los montos y
+   * consume el cupón en el servidor (idempotente por `orderId`). Devuelve el id
+   * del pedido creado.
+   */
+  createCashOrder: async (
+    orderInput: NewOrderInput,
+    orderId: string
+  ): Promise<string> => {
+    const { data } = await createCashOrderFn({ orderInput, orderId });
     return data.orderId;
   },
 

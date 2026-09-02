@@ -9,11 +9,9 @@ import {
   query,
   where,
   serverTimestamp,
-  increment,
-  writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
-import { DeliveryTracking, NewOrderInput, Order } from '@/types/order.types';
+import { DeliveryTracking, Order } from '@/types/order.types';
 
 const ordersCol = () => collection(db, 'orders');
 const orderRef = (orderId: string) => doc(db, 'orders', orderId);
@@ -28,31 +26,10 @@ const ACTIVE_STATUSES: Order['status'][] = [
 ];
 
 export const ordersService = {
-  /**
-   * Crea el pedido (status=pending) y, si trae cupón, incrementa su usedCount
-   * en un batch atómico. paymentStatus arranca en 'pending' (sin pasarela real).
-   * Devuelve el id del pedido creado.
-   */
-  createOrder: async (input: NewOrderInput): Promise<string> => {
-    const ref = doc(ordersCol());
-    const batch = writeBatch(db);
-
-    batch.set(ref, {
-      ...input,
-      status: 'pending',
-      paymentStatus: 'pending',
-      createdAt: serverTimestamp(),
-    });
-
-    if (input.couponCode) {
-      batch.update(doc(db, 'coupons', input.couponCode), {
-        usedCount: increment(1),
-      });
-    }
-
-    await batch.commit();
-    return ref.id;
-  },
+  // Nota: los pedidos ya NO se crean desde el cliente. Los crea Cloud Functions
+  // (Admin SDK) recalculando montos en el servidor: tarjeta -> createCardCharge,
+  // efectivo -> createCashOrder (ver services/payments.service.ts). Las reglas de
+  // `orders` (create) y `coupons` (update) están cerradas al cliente (F2/F3).
 
   getById: async (orderId: string): Promise<Order | null> => {
     const snap = await getDoc(orderRef(orderId));
