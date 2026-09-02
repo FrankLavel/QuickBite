@@ -49,10 +49,15 @@ service cloud.firestore {
              && get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'delivered';
     }
 
-    // Solo estos campos del perfil puede editar el cliente (nunca role/restaurantId/email/createdAt).
+    // Campos del perfil que el propio usuario puede editar (nunca role/restaurantId/
+    // email/createdAt). 'isAvailable' y 'vehicle' los usa la app del repartidor
+    // (rol 'driver'); se valida su tipo al escribirlos. El cliente no los escribe,
+    // así que exponer las llaves aquí es inocuo (F1).
     function onlyEditableUserFields() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken', 'webPushSubscription']);
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken', 'webPushSubscription', 'isAvailable', 'vehicle'])
+             && (!affected.hasAny(['isAvailable']) || request.resource.data.isAvailable is bool)
+             && (!affected.hasAny(['vehicle']) || request.resource.data.vehicle is string);
     }
 
     // ---------- users ----------
@@ -132,12 +137,10 @@ service cloud.firestore {
 
       allow create: if isRestaurantOwner(request.resource.data.restaurantId);
 
-      // El restaurante dueño edita el cupón; el cliente solo puede incrementar
-      // usedCount en exactamente 1 (al aplicarlo en su pedido).
-      allow update: if isRestaurantOwner(resource.data.restaurantId)
-                    || (isSignedIn()
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount'])
-                        && request.resource.data.usedCount == resource.data.usedCount + 1);
+      // Solo el restaurante dueño edita el cupón. El consumo (usedCount++) lo hace
+      // Cloud Functions al crear el pedido, en la misma transacción, para que el
+      // cliente no pueda agotar cupones ajenos ni saltarse validaciones (F3).
+      allow update: if isRestaurantOwner(resource.data.restaurantId);
 
       allow delete: if isRestaurantOwner(resource.data.restaurantId);
     }
@@ -153,14 +156,11 @@ service cloud.firestore {
                       || (isDriver()
                           && resource.data.get('driverId', '') == request.auth.uid));
 
-      // Crear: el customerId debe ser el usuario actual y el estado inicial
-      // 'pending'. Además el cliente NO puede marcar el pedido como pagado: los
-      // pedidos con tarjeta los crea Cloud Functions (Admin SDK) tras cobrar en
-      // Openpay; los que crea el cliente (efectivo/PayPal) van con 'pending'.
-      allow create: if isSignedIn()
-                    && request.resource.data.customerId == request.auth.uid
-                    && request.resource.data.status == 'pending'
-                    && request.resource.data.paymentStatus == 'pending';
+      // Crear: NADIE crea pedidos desde el cliente. TODOS los pedidos los crea
+      // Cloud Functions con el Admin SDK, recalculando los montos en el servidor:
+      // tarjeta -> createCardCharge (tras cobrar en Openpay); efectivo ->
+      // createCashOrder. Así el cliente no puede manipular total/descuento/cupón (F2).
+      allow create: if false;
 
       // Cliente: agrega/edita su calificación, o cancela el pedido mientras
       // sigue en 'pending' (status -> 'cancelled', + cancelledAt).
@@ -170,7 +170,11 @@ service cloud.firestore {
                     && (
                       (resource.data.customerId == request.auth.uid
                        && (
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
+                         // La calificación debe ser un entero de 1 a 5 (F6).
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
+                          && request.resource.data.rating is int
+                          && request.resource.data.rating >= 1
+                          && request.resource.data.rating <= 5)
                          ||
                          (resource.data.status == 'pending'
                           && request.resource.data.status == 'cancelled'
