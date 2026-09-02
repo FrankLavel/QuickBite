@@ -422,35 +422,136 @@ exports.onReviewWritten = onDocumentWritten(
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/** ¿La oferta está activa y dentro de su ventana? (mirror de offers.service.ts) */
+function offerVisible(o) {
+  if (!o || !o.isActive) return false;
+  const now = Date.now();
+  const start = o.startsAt && o.startsAt.toMillis ? o.startsAt.toMillis() : undefined;
+  const end = o.endsAt && o.endsAt.toMillis ? o.endsAt.toMillis() : undefined;
+  if (start && now < start) return false;
+  if (end && now > end) return false;
+  return true;
+}
+
+/** Promo de la oferta de platillo activa para un producto (mirror de lib/promo.ts). */
+function offerPromoFor(offers, restaurantId, productId) {
+  const offer = offers.find(
+    (o) =>
+      o.type === 'dish' &&
+      o.restaurantId === restaurantId &&
+      o.productId === productId &&
+      !!o.discountKind
+  );
+  if (!offer) return null;
+  if (offer.discountKind === '2x1') return { kind: '2x1' };
+  if (offer.discountKind === 'percent' && (offer.discountPercent || 0) > 0) {
+    return { kind: 'percent', percent: offer.discountPercent };
+  }
+  return null;
+}
+
+/** Subtotal de una línea aplicando su promo (mirror de lib/promo.ts lineSubtotal). */
+function lineSubtotalServer(unit, qty, promo) {
+  const base = unit * qty;
+  if (!promo) return base;
+  if (promo.kind === 'percent') {
+    const pct = Math.min(Math.max(promo.percent, 0), 100);
+    return base * (1 - pct / 100);
+  }
+  return unit * Math.ceil(qty / 2); // 2x1: se pagan ceil(qty/2) unidades
+}
+
 /**
- * Recalcula los montos del pedido EN EL SERVIDOR a partir de los items, el
- * deliveryFee del restaurante y el cupón (Firestore). Nunca se confía en el
- * `total` que manda el cliente (evita manipulación del importe a cobrar).
- * Devuelve { subtotal, deliveryFee, discount, total, couponCode }.
+ * Toppings legítimos de un producto como pares {name, price}. El cliente trata
+ * product.toppings como add-ons planos a nivel de grupo (name + price), así que
+ * se valida contra ese nivel (ver app/product/[id].tsx).
+ */
+function toppingPricesFor(product) {
+  return (Array.isArray(product.toppings) ? product.toppings : []).map((t) => ({
+    name: t.name,
+    price: Number(t.price) || 0,
+  }));
+}
+
+/**
+ * Recalcula los montos del pedido EN EL SERVIDOR desde el precio REAL de cada
+ * producto (nunca el que manda el cliente): base + toppings validados contra el
+ * catálogo del platillo, promos tomadas de las ofertas vigentes, deliveryFee del
+ * restaurante y cupón revalidado. Cierra la manipulación de precios/promo/total
+ * en ambos flujos de pago (F16). Devuelve { subtotal, deliveryFee, discount,
+ * total, couponCode }.
  */
 async function computeOrderTotals(input) {
   const items = Array.isArray(input.items) ? input.items : [];
   if (items.length === 0) {
     throw new HttpsError('invalid-argument', 'El pedido no tiene productos.');
   }
-
-  let subtotal = 0;
-  for (const it of items) {
-    const price = Number(it.price);
-    const qty = Number(it.qty);
-    if (!(price >= 0) || !(qty > 0)) {
-      throw new HttpsError('invalid-argument', 'Producto con precio/cantidad inválidos.');
-    }
-    subtotal += round2(price * qty);
-  }
-  subtotal = round2(subtotal);
+  const restaurantId = input.restaurantId;
 
   // deliveryFee real del restaurante.
-  const restSnap = await db.collection('restaurants').doc(input.restaurantId).get();
+  const restSnap = await db.collection('restaurants').doc(restaurantId).get();
   if (!restSnap.exists) {
     throw new HttpsError('not-found', 'Restaurante no encontrado.');
   }
   const deliveryFee = Number(restSnap.get('deliveryFee')) || 0;
+
+  // Ofertas de platillo VIGENTES del restaurante: la promo se toma de aquí, no de
+  // lo que envíe el cliente (evita inventar un 100% off).
+  const offersSnap = await db
+    .collection('offers')
+    .where('restaurantId', '==', restaurantId)
+    .get();
+  const offers = offersSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter(offerVisible);
+
+  // Precios REALES de los productos del pedido (una sola lectura por lote).
+  const productRefs = items.map((it) =>
+    db
+      .collection('restaurants')
+      .doc(restaurantId)
+      .collection('products')
+      .doc(String(it.productId))
+  );
+  const productSnaps = await db.getAll(...productRefs);
+  const productById = {};
+  productSnaps.forEach((s) => {
+    if (s.exists) productById[s.id] = s.data();
+  });
+
+  // Subtotal recomputado: base real + toppings validados (nombre + precio del
+  // catálogo) y la promo autoritativa. Un precio/topping/promo alterado rechaza
+  // el pedido; nunca se confía en el `price`/`promo` del cliente.
+  let subtotal = 0;
+  for (const it of items) {
+    const qty = Number(it.qty);
+    if (!(qty > 0)) {
+      throw new HttpsError('invalid-argument', 'Cantidad de producto inválida.');
+    }
+    const product = productById[String(it.productId)];
+    if (!product) {
+      throw new HttpsError('invalid-argument', 'Un producto del pedido no existe.');
+    }
+    if (product.isAvailable === false) {
+      throw new HttpsError('failed-precondition', `"${product.name}" ya no está disponible.`);
+    }
+
+    const allowed = toppingPricesFor(product);
+    let unit = Number(product.price) || 0;
+    for (const t of Array.isArray(it.toppings) ? it.toppings : []) {
+      const match = allowed.find(
+        (a) => a.name === t.name && round2(a.price) === round2(Number(t.price))
+      );
+      if (!match) {
+        throw new HttpsError('invalid-argument', 'Personalización inválida en el pedido.');
+      }
+      unit += match.price;
+    }
+
+    const promo = offerPromoFor(offers, restaurantId, String(it.productId));
+    subtotal += round2(lineSubtotalServer(unit, qty, promo));
+  }
+  subtotal = round2(subtotal);
 
   // Descuento por cupón (revalidado contra Firestore).
   let discount = 0;
@@ -731,6 +832,95 @@ exports.createCardCharge = onCall(
     return { orderId, chargeId: charge.id };
   }
 );
+
+/**
+ * createCashOrder — Callable. Crea un pedido en EFECTIVO recalculando los montos
+ * EN EL SERVIDOR (nunca se confía en el total/descuento/tarifa/cupón que manda el
+ * cliente) y consumiendo el cupón en el mismo batch atómico, todo con el Admin SDK
+ * (salta las Security Rules). Con esto el cliente ya NO crea pedidos ni incrementa
+ * cupones directamente: las reglas de `orders` (create) y `coupons` (update) quedan
+ * cerradas al cliente (F2/F3).
+ *
+ * data: { orderInput: NewOrderInput, orderId?: string }
+ * return: { orderId }
+ */
+exports.createCashOrder = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Inicia sesión para pedir.');
+  }
+
+  const { orderInput, orderId: clientOrderId } = request.data || {};
+  if (!orderInput || !orderInput.restaurantId) {
+    throw new HttpsError('invalid-argument', 'Faltan datos del pedido.');
+  }
+  if (orderInput.paymentMethod !== 'cash') {
+    throw new HttpsError('invalid-argument', 'Método de pago no soportado.');
+  }
+  if (!orderInput.deliveryAddress) {
+    throw new HttpsError('invalid-argument', 'Falta la dirección de entrega.');
+  }
+
+  // Id estable (lo genera el cliente por checkout) para ser idempotente entre
+  // reintentos: si el pedido ya existe, se devuelve sin duplicar.
+  const orderRef = clientOrderId
+    ? db.collection('orders').doc(String(clientOrderId))
+    : db.collection('orders').doc();
+  const orderId = orderRef.id;
+
+  const existing = await orderRef.get();
+  if (existing.exists) {
+    if (existing.get('customerId') !== uid) {
+      throw new HttpsError('invalid-argument', 'Identificador de pedido inválido.');
+    }
+    return { orderId };
+  }
+
+  // Montos recalculados en el servidor (fuente de verdad): valida items, toma el
+  // deliveryFee real del restaurante y revalida el cupón contra Firestore.
+  const totals = await computeOrderTotals(orderInput);
+  if (totals.total < 0) {
+    throw new HttpsError('failed-precondition', 'El total del pedido es inválido.');
+  }
+
+  // Propina (solo efectivo): número >= 0; cualquier otra cosa se ignora.
+  const tipNum = Number(orderInput.tip);
+  const tip = Number.isFinite(tipNum) && tipNum > 0 ? round2(tipNum) : 0;
+
+  const orderDoc = {
+    customerId: uid, // desde auth, nunca del cliente
+    restaurantId: orderInput.restaurantId,
+    items: orderInput.items,
+    subtotal: totals.subtotal,
+    deliveryFee: totals.deliveryFee,
+    discount: totals.discount,
+    total: totals.total,
+    deliveryAddress: orderInput.deliveryAddress,
+    paymentMethod: 'cash',
+    paymentStatus: 'pending',
+    couponCode: totals.couponCode,
+    status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+    ...(tip > 0 ? { tip } : {}),
+    ...(orderInput.customerName ? { customerName: orderInput.customerName } : {}),
+    ...(orderInput.customerPhone ? { customerPhone: orderInput.customerPhone } : {}),
+    ...(orderInput.specialInstructions
+      ? { specialInstructions: orderInput.specialInstructions }
+      : {}),
+  };
+
+  // Crear el pedido + consumir el cupón en un batch atómico (server-side).
+  const batch = db.batch();
+  batch.set(orderRef, orderDoc);
+  if (totals.couponCode) {
+    batch.update(db.collection('coupons').doc(totals.couponCode), {
+      usedCount: FieldValue.increment(1),
+    });
+  }
+  await batch.commit();
+
+  return { orderId };
+});
 
 /**
  * saveCard — guarda una tarjeta (desde un token de Openpay.js) en el cliente
