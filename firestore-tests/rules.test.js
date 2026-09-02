@@ -199,6 +199,57 @@ describe('Reparto · reclamo concurrente', () => {
   });
 });
 
+describe('F4 · máquina de estados del restaurante', () => {
+  function seedOrder(id, status, extra = {}) {
+    return seed((d) =>
+      setDoc(doc(d, `orders/${id}`), {
+        customerId: 'cust1',
+        restaurantId: 'r1',
+        status,
+        paymentStatus: 'paid',
+        total: 100,
+        ...extra,
+      })
+    );
+  }
+
+  test('avanza un paso válido (pending → accepted)', async () => {
+    await seedOrder('m1', 'pending');
+    const ro = asUser('restOwner');
+    await assertSucceeds(
+      updateDoc(doc(ro, 'orders/m1'), { status: 'accepted', acceptedAt: serverTimestamp() })
+    );
+  });
+
+  test('rechaza un salto de estado (pending → delivered)', async () => {
+    await seedOrder('m2', 'pending');
+    const ro = asUser('restOwner');
+    await assertFails(
+      updateDoc(doc(ro, 'orders/m2'), { status: 'delivered', deliveredAt: serverTimestamp() })
+    );
+  });
+
+  test('permite rechazar un pedido pendiente', async () => {
+    await seedOrder('m3', 'pending');
+    const ro = asUser('restOwner');
+    await assertSucceeds(
+      updateDoc(doc(ro, 'orders/m3'), { status: 'rejected', rejectionReason: 'sin stock' })
+    );
+  });
+
+  test('no permite retroceder (ready → pending)', async () => {
+    await seedOrder('m4', 'ready');
+    const ro = asUser('restOwner');
+    await assertFails(updateDoc(doc(ro, 'orders/m4'), { status: 'pending' }));
+  });
+
+  test('permite liquidar (settledAt) sin cambiar el status', async () => {
+    await seedOrder('m5', 'delivered');
+    const ro = asUser('restOwner');
+    await assertSucceeds(updateDoc(doc(ro, 'orders/m5'), { settledAt: serverTimestamp() }));
+  });
+});
+
 describe('Lecturas base', () => {
   beforeEach(async () => {
     await seed(async (d) => {

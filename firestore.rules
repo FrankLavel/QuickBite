@@ -40,6 +40,19 @@ service cloud.firestore {
       return isSignedIn() && currentUserData().role == 'driver';
     }
 
+    // Máquina de estados del restaurante (F4): transiciones válidas de status.
+    // Refleja el flujo del dashboard: avance de un paso a lo largo de
+    // pending -> accepted -> preparing -> ready -> on_the_way -> delivered, o
+    // rechazo mientras el pedido aún no salió a reparto. Evita saltos (p. ej.
+    // pending -> delivered) y retrocesos.
+    function validRestaurantTransition(from, to) {
+      return (from == 'pending' && (to == 'accepted' || to == 'rejected'))
+          || (from == 'accepted' && (to == 'preparing' || to == 'rejected'))
+          || (from == 'preparing' && (to == 'ready' || to == 'rejected'))
+          || (from == 'ready' && to == 'on_the_way')
+          || (from == 'on_the_way' && to == 'delivered');
+    }
+
     // Compra verificada para reseñas: el pedido existe, es del usuario actual y
     // está 'delivered'. (No se valida que el producto esté en items[] porque las
     // reglas no pueden recorrer arrays de maps; eso lo garantiza el cliente.)
@@ -181,9 +194,14 @@ service cloud.firestore {
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']))
                        ))
                       ||
+                      // Restaurante: edita solo estos campos y, si cambia el status,
+                      // respeta una transición válida (F4). Los edits que no tocan el
+                      // status (estimatedTime, settledAt) siguen permitidos.
                       (isRestaurantOwner(resource.data.restaurantId)
                        && request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason']))
+                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason'])
+                       && (request.resource.data.status == resource.data.status
+                           || validRestaurantTransition(resource.data.status, request.resource.data.status)))
                       ||
                       // Repartidor reclama un pedido disponible ('ready' y sin driver).
                       // Solo fija driverId+assignedAt; el nombre/teléfono los pone una
