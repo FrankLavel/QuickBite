@@ -10,5 +10,9 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
+  },
+  "//overrides": "Una sola version de @types/react en todo el monorepo: evita el conflicto de 'dos copias' entre apps con distinto Expo SDK (54 vs 53).",
+  "overrides": {
+    "@types/react": "19.1.17"
   }
 }

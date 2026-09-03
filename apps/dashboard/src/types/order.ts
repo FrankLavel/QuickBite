@@ -3,9 +3,15 @@
  * Colección orders/{orderId}
  */
 
-import type { ORDER_STATUS } from '../utils/constants';
+// Enums del contrato de pedido: fuente de verdad en @quickbite/shared (F5).
+import type {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentProvider,
+} from '@quickbite/shared';
 
-export type OrderStatus = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS];
+export type { OrderStatus, PaymentMethod, PaymentStatus, PaymentProvider };
 
 export interface OrderItemTopping {
   name: string;
@@ -41,10 +47,10 @@ export interface Order {
   discount: number;
   total: number;
   deliveryAddress: DeliveryAddress;
-  paymentMethod: 'card' | 'paypal' | 'cash';
-  paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded';
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   /** Pasarela usada (solo pagos con tarjeta). Ausente en cash/paypal. */
-  paymentProvider?: 'openpay';
+  paymentProvider?: PaymentProvider;
   /** Id del cargo en Openpay (para conciliar/reembolsar). */
   openpayChargeId?: string;
   /** Marca y últimos 4 de la tarjeta, para mostrar en el pedido. */

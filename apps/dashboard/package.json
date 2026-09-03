@@ -1,5 +1,5 @@
 {
-  "name": "quickbite",
+  "name": "quickbite-dashboard",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -19,6 +19,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~5.0.5",
     "@expo/vector-icons": "^14.1.0",
+    "@quickbite/shared": "*",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.4.1",
     "@react-navigation/bottom-tabs": "^7.3.10",

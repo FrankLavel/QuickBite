@@ -6,6 +6,7 @@ module.exports = {
   // Alias "@/..." → "src/..." (mismo que tsconfig.json).
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@quickbite/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },
   // Solo transpila las libs de RN/Expo/Firebase que se publican en ESM.
   transformIgnorePatterns: [
