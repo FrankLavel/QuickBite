@@ -1,18 +1,20 @@
-import { db } from '@/lib/firebase';
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { collection, getDocs } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase';
 import { NewProductReview, ProductReview } from '@/types/review.types';
 
 const reviewsCol = (restId: string, prodId: string) =>
   collection(db, 'restaurants', restId, 'products', prodId, 'reviews');
 
-const reviewRef = (restId: string, prodId: string, userId: string) =>
-  doc(db, 'restaurants', restId, 'products', prodId, 'reviews', userId);
+/**
+ * Envía la reseña vía Cloud Function: el servidor verifica que el usuario recibió
+ * el producto en un pedido entregado y la escribe con el Admin SDK. El cliente ya
+ * no escribe reseñas directamente (las reglas lo bloquean) (F7).
+ */
+const submitReviewFn = httpsCallable<
+  { restaurantId: string; productId: string; rating: number; comment: string },
+  { ok: boolean }
+>(functions, 'submitReview');
 
 export const reviewsService = {
   /** Reseñas del producto, más recientes primero. */
@@ -24,16 +26,19 @@ export const reviewsService = {
   },
 
   /**
-   * Crea o reemplaza la reseña del usuario (doc id = userId). Las Security
-   * Rules exigen que orderId sea un pedido 'delivered' del propio usuario.
+   * Crea o reemplaza la reseña del usuario. El servidor deriva el pedido que la
+   * respalda y el nombre/foto del perfil; aquí solo van rating y comentario.
    */
-  submit: (
+  submit: async (
     restId: string,
     prodId: string,
     review: NewProductReview
-  ): Promise<void> =>
-    setDoc(reviewRef(restId, prodId, review.userId), {
-      ...review,
-      createdAt: serverTimestamp(),
-    }),
+  ): Promise<void> => {
+    await submitReviewFn({
+      restaurantId: restId,
+      productId: prodId,
+      rating: review.rating,
+      comment: review.comment,
+    });
+  },
 };

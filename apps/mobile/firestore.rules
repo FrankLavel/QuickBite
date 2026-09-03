@@ -110,7 +110,13 @@ service cloud.firestore {
     // ---------- restaurants ----------
     match /restaurants/{restId} {
       allow read: if isSignedIn();
-      allow write: if isRestaurantOwner(restId);
+      // El restaurante dueño escribe; si toca deliveryFee debe ser numérico >= 0
+      // (lo lee computeOrderTotals). En delete no hay request.resource (F8).
+      allow create, update: if isRestaurantOwner(restId)
+                            && (!('deliveryFee' in request.resource.data)
+                                || (request.resource.data.deliveryFee is number
+                                    && request.resource.data.deliveryFee >= 0));
+      allow delete: if isRestaurantOwner(restId);
 
       match /categories/{catId} {
         allow read: if isSignedIn();
@@ -119,19 +125,22 @@ service cloud.firestore {
 
       match /products/{prodId} {
         allow read: if isSignedIn();
-        allow write: if isRestaurantOwner(restId);
+        // El restaurante dueño escribe; se validan campos clave (F8): precio
+        // numérico >= 0 (lo lee computeOrderTotals) y nombre string. En delete no
+        // hay request.resource, por eso va aparte.
+        allow create, update: if isRestaurantOwner(restId)
+                              && request.resource.data.price is number
+                              && request.resource.data.price >= 0
+                              && request.resource.data.name is string;
+        allow delete: if isRestaurantOwner(restId);
 
-        // Reseñas de producto: doc id = uid del autor (una por usuario/producto).
-        // Solo quien tiene un pedido 'delivered' propio puede crear/editar la suya.
+        // Reseñas de producto (doc id = uid del autor, una por usuario/producto):
+        // las crea/edita la Cloud Function submitReview tras verificar que el
+        // usuario recibió el producto en un pedido entregado (F7). El cliente solo
+        // lee y borra la suya; ya no las escribe directamente.
         match /reviews/{userId} {
           allow read: if isSignedIn();
-          allow create, update: if isUser(userId)
-                        && request.resource.data.userId == userId
-                        && request.resource.data.rating is int
-                        && request.resource.data.rating >= 1
-                        && request.resource.data.rating <= 5
-                        && request.resource.data.comment is string
-                        && orderIsDeliveredForUser(request.resource.data.orderId);
+          allow create, update: if false;
           allow delete: if isUser(userId);
         }
       }

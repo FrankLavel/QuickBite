@@ -358,6 +358,76 @@ exports.onOfferCreated = onDocumentCreated('offers/{offerId}', async (event) => 
 });
 
 /**
+ * submitReview — Callable. Crea/edita la reseña de un platillo SOLO si el usuario
+ * tiene un pedido 'delivered' propio que INCLUYE ese producto (compra verificada
+ * de verdad). Las Security Rules no pueden recorrer items[], así que esta
+ * validación vive aquí; las reglas bloquean la escritura directa del cliente (F7).
+ *
+ * data: { restaurantId, productId, rating, comment } -> { ok: true }
+ */
+exports.submitReview = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Inicia sesión para reseñar.');
+
+  const { restaurantId, productId } = request.data || {};
+  const rating = Number(request.data && request.data.rating);
+  const comment = String((request.data && request.data.comment) || '');
+  if (!restaurantId || !productId) {
+    throw new HttpsError('invalid-argument', 'Falta el producto a reseñar.');
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new HttpsError('invalid-argument', 'La calificación debe ser un entero de 1 a 5.');
+  }
+  if (comment.length > 1000) {
+    throw new HttpsError('invalid-argument', 'El comentario es demasiado largo.');
+  }
+
+  // Compra verificada: un pedido 'delivered' del usuario, de ese restaurante, que
+  // contenga el producto. (where solo por customerId: no requiere índice compuesto.)
+  const ordersSnap = await db
+    .collection('orders')
+    .where('customerId', '==', uid)
+    .get();
+  const backing = ordersSnap.docs.find(
+    (d) =>
+      d.get('status') === 'delivered' &&
+      d.get('restaurantId') === restaurantId &&
+      Array.isArray(d.get('items')) &&
+      d.get('items').some((it) => it && it.productId === productId)
+  );
+  if (!backing) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Solo puedes reseñar un platillo que hayas recibido en un pedido entregado.'
+    );
+  }
+
+  // Nombre/foto reales desde el perfil (no se confía en el cliente).
+  const userSnap = await db.collection('users').doc(uid).get();
+  const userName = userSnap.get('name') || 'Cliente';
+  const userPhotoURL = userSnap.get('photoURL') || null;
+
+  await db
+    .collection('restaurants')
+    .doc(restaurantId)
+    .collection('products')
+    .doc(productId)
+    .collection('reviews')
+    .doc(uid)
+    .set({
+      userId: uid,
+      userName,
+      ...(userPhotoURL ? { userPhotoURL } : {}),
+      orderId: backing.id,
+      rating,
+      comment: comment.trim(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+  return { ok: true };
+});
+
+/**
  * Al escribir (crear/editar/borrar) una reseña de platillo, recalcula:
  *  - product.rating / reviewCount = promedio de las reseñas del platillo.
  *  - restaurant.rating = promedio de las calificaciones de sus platillos

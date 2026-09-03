@@ -19,6 +19,7 @@ const {
   setDoc,
   getDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
 } = require('firebase/firestore');
 
@@ -247,6 +248,57 @@ describe('F4 · máquina de estados del restaurante', () => {
     await seedOrder('m5', 'delivered');
     const ro = asUser('restOwner');
     await assertSucceeds(updateDoc(doc(ro, 'orders/m5'), { settledAt: serverTimestamp() }));
+  });
+});
+
+describe('F7 · reseñas', () => {
+  test('el cliente NO puede escribir una reseña directamente', async () => {
+    const c = asUser('cust1');
+    await assertFails(
+      setDoc(doc(c, 'restaurants/r1/products/p1/reviews/cust1'), {
+        userId: 'cust1',
+        rating: 5,
+        comment: 'rico',
+        orderId: 'o1',
+      })
+    );
+  });
+
+  test('el cliente sí puede borrar su propia reseña', async () => {
+    await seed((d) =>
+      setDoc(doc(d, 'restaurants/r1/products/p1/reviews/cust1'), { userId: 'cust1', rating: 5 })
+    );
+    const c = asUser('cust1');
+    await assertSucceeds(deleteDoc(doc(c, 'restaurants/r1/products/p1/reviews/cust1')));
+  });
+});
+
+describe('F8 · validación de esquema (restaurante/producto)', () => {
+  test('producto con precio válido y nombre: permitido', async () => {
+    const ro = asUser('restOwner');
+    await assertSucceeds(
+      setDoc(doc(ro, 'restaurants/r1/products/p1'), { name: 'Taco', price: 25, isAvailable: true })
+    );
+  });
+
+  test('producto con precio negativo: rechazado', async () => {
+    const ro = asUser('restOwner');
+    await assertFails(setDoc(doc(ro, 'restaurants/r1/products/p2'), { name: 'Taco', price: -5 }));
+  });
+
+  test('producto con precio no numérico: rechazado', async () => {
+    const ro = asUser('restOwner');
+    await assertFails(setDoc(doc(ro, 'restaurants/r1/products/p3'), { name: 'Taco', price: '25' }));
+  });
+
+  test('restaurante con deliveryFee negativo: rechazado', async () => {
+    const ro = asUser('restOwner');
+    await assertFails(setDoc(doc(ro, 'restaurants/r1'), { name: 'R', deliveryFee: -10 }));
+  });
+
+  test('restaurante con deliveryFee válido: permitido', async () => {
+    const ro = asUser('restOwner');
+    await assertSucceeds(setDoc(doc(ro, 'restaurants/r1'), { name: 'R', deliveryFee: 30 }));
   });
 });
 
