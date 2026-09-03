@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /$
+Allow: /index.html
+Allow: /manifest.json
+
+# El resto del panel vive detrás de login; no tiene sentido rastrearlo.
+Disallow: /r/
+Disallow: /p/
+
+Sitemap: https://quickbite-6dee7.web.app/sitemap.xml

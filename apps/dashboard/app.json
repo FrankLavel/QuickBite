@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "QuickBite",
+    "slug": "quickbite",
+    "scheme": "quickbite",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.quickbite.merchant",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "QuickBite necesita acceso a tu galería para subir imágenes de platillos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "package": "com.quickbite.merchant",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon-quickbite.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "QuickBite necesita acceso a tu galería para subir imágenes de platillos."
+        }
+      ],
+      "expo-secure-store",
+      "expo-asset",
+      "expo-font",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

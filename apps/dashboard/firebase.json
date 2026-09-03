@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [
+      {
+        "source": "/r/**",
+        "function": { "functionId": "share", "region": "us-central1" }
+      },
+      {
+        "source": "/p/**",
+        "function": { "functionId": "share", "region": "us-central1" }
+      },
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}

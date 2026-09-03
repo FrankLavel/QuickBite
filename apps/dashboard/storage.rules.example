@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// QuickBite — Storage (app móvil + portal restaurante)
+// Basado en tus reglas actuales + lectura pública de imágenes de productos
+// (el menú web las muestra con <img>/expo-image sin token de Auth en la petición HTTP).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function currentUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isRestaurantOwner(restId) {
+      return isSignedIn()
+             && currentUserData().role == 'restaurant'
+             && currentUserData().restaurantId == restId;
+    }
+
+    // /users/{uid}/avatar_*.jpg
+    match /users/{uid}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isUser(uid);
+    }
+
+    // Imágenes de platillos — lectura pública para catálogo (portal + app móvil)
+    match /restaurants/{restId}/products/{fileName} {
+      allow read: if true;
+      allow write: if isRestaurantOwner(restId);
+    }
+
+    // cover.jpg, logo.jpg y demás archivos del restaurante
+    match /restaurants/{restId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+    }
+
+    // /offers/{restId}/{offerId}.jpg
+    match /offers/{restId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+    }
+  }
+}
