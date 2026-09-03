@@ -1,0 +1,274 @@
+rules_version = '2';
+
+// Reglas de seguridad de QuickBite (App Móvil + Dashboard Web del Restaurante).
+// Dos roles, ambos autenticados con Firebase Auth + Firestore (sin Admin SDK):
+//   - 'customer' (app móvil): se autoregistra, gestiona su propio perfil/pedidos/
+//     notificaciones, y solo lee catálogo/ofertas/cupones.
+//   - 'restaurant' (dashboard web): NO se autoregistra desde el cliente — su
+//     documento /users/{uid} (con role='restaurant' y restaurantId) lo provisiona
+//     el equipo del dashboard por fuera de estas reglas (Admin SDK/Cloud Function),
+//     para evitar que cualquiera se autoasigne un restaurantId. Una vez provisionado,
+//     administra su propio restaurante/menú/ofertas/cupones y el status de sus pedidos.
+//   - 'driver' (app QuickBite Driver): NO se autoregistra (lo provisiona el admin,
+//     igual que 'restaurant'). En modelo auto-servicio reclama pedidos 'ready' sin
+//     repartidor y avanza su status: 'ready' -> 'on_the_way' -> 'delivered'.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function currentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // El restaurante autenticado solo administra el restaurantId que le fue asignado.
+    function isRestaurantOwner(restId) {
+      return isSignedIn()
+             && currentUserData().role == 'restaurant'
+             && currentUserData().restaurantId == restId;
+    }
+
+    // El repartidor autenticado (rol 'driver', provisionado por el admin).
+    function isDriver() {
+      return isSignedIn() && currentUserData().role == 'driver';
+    }
+
+    // Máquina de estados del restaurante (F4): transiciones válidas de status.
+    // Refleja el flujo del dashboard: avance de un paso a lo largo de
+    // pending -> accepted -> preparing -> ready -> on_the_way -> delivered, o
+    // rechazo mientras el pedido aún no salió a reparto. Evita saltos (p. ej.
+    // pending -> delivered) y retrocesos.
+    function validRestaurantTransition(from, to) {
+      return (from == 'pending' && (to == 'accepted' || to == 'rejected'))
+          || (from == 'accepted' && (to == 'preparing' || to == 'rejected'))
+          || (from == 'preparing' && (to == 'ready' || to == 'rejected'))
+          || (from == 'ready' && to == 'on_the_way')
+          || (from == 'on_the_way' && to == 'delivered');
+    }
+
+    // Compra verificada para reseñas: el pedido existe, es del usuario actual y
+    // está 'delivered'. (No se valida que el producto esté en items[] porque las
+    // reglas no pueden recorrer arrays de maps; eso lo garantiza el cliente.)
+    function orderIsDeliveredForUser(orderId) {
+      return exists(/databases/$(database)/documents/orders/$(orderId))
+             && get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid
+             && get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'delivered';
+    }
+
+    // Campos del perfil que el propio usuario puede editar (nunca role/restaurantId/
+    // email/createdAt). 'isAvailable' y 'vehicle' los usa la app del repartidor
+    // (rol 'driver'); se valida su tipo al escribirlos. El cliente no los escribe,
+    // así que exponer las llaves aquí es inocuo (F1).
+    function onlyEditableUserFields() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['name', 'phone', 'photoURL', 'addresses', 'favoriteIds', 'favoriteProductIds', 'darkMode', 'pushToken', 'webPushSubscription', 'isAvailable', 'vehicle'])
+             && (!affected.hasAny(['isAvailable']) || request.resource.data.isAvailable is bool)
+             && (!affected.hasAny(['vehicle']) || request.resource.data.vehicle is string);
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isUser(uid);
+
+      // Autoregistro: solo permite crear el propio perfil como 'customer'.
+      // Las cuentas 'restaurant' se provisionan fuera del cliente (ver nota arriba).
+      allow create: if isUser(uid)
+                    && request.resource.data.role == 'customer';
+
+      allow update: if isUser(uid) && onlyEditableUserFields();
+      // El usuario puede eliminar su propio perfil (opción "Eliminar cuenta").
+      allow delete: if isUser(uid);
+
+      // ---------- users/{uid}/notifications ----------
+      // Las crea Cloud Functions (Admin SDK). El cliente solo lee y marca isRead.
+      match /notifications/{notifId} {
+        allow read: if isUser(uid);
+        allow update: if isUser(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+        allow create: if false;
+        // El cliente puede borrar sus propias notificaciones (limpiar historial).
+        allow delete: if isUser(uid);
+      }
+
+      // ---------- users/{uid}/cards (tarjetas guardadas) ----------
+      // Solo referencias (marca, últimos 4, card_id de Openpay), NUNCA el PAN.
+      // Las crea/borra Cloud Functions (Admin SDK) al hablar con Openpay; el
+      // cliente solo lee las suyas.
+      match /cards/{cardId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+    }
+
+    // ---------- restaurants ----------
+    match /restaurants/{restId} {
+      allow read: if isSignedIn();
+      allow write: if isRestaurantOwner(restId);
+
+      match /categories/{catId} {
+        allow read: if isSignedIn();
+        allow write: if isRestaurantOwner(restId);
+      }
+
+      match /products/{prodId} {
+        allow read: if isSignedIn();
+        allow write: if isRestaurantOwner(restId);
+
+        // Reseñas de producto: doc id = uid del autor (una por usuario/producto).
+        // Solo quien tiene un pedido 'delivered' propio puede crear/editar la suya.
+        match /reviews/{userId} {
+          allow read: if isSignedIn();
+          allow create, update: if isUser(userId)
+                        && request.resource.data.userId == userId
+                        && request.resource.data.rating is int
+                        && request.resource.data.rating >= 1
+                        && request.resource.data.rating <= 5
+                        && request.resource.data.comment is string
+                        && orderIsDeliveredForUser(request.resource.data.orderId);
+          allow delete: if isUser(userId);
+        }
+      }
+    }
+
+    // ---------- offers (banners promocionales) ----------
+    match /offers/{offerId} {
+      allow read: if isSignedIn();
+      allow create: if isRestaurantOwner(request.resource.data.restaurantId);
+      allow update, delete: if isRestaurantOwner(resource.data.restaurantId);
+    }
+
+    // ---------- coupons (uno por restaurante) ----------
+    match /coupons/{code} {
+      allow read: if isSignedIn();
+
+      allow create: if isRestaurantOwner(request.resource.data.restaurantId);
+
+      // Solo el restaurante dueño edita el cupón. El consumo (usedCount++) lo hace
+      // Cloud Functions al crear el pedido, en la misma transacción, para que el
+      // cliente no pueda agotar cupones ajenos ni saltarse validaciones (F3).
+      allow update: if isRestaurantOwner(resource.data.restaurantId);
+
+      allow delete: if isRestaurantOwner(resource.data.restaurantId);
+    }
+
+    // ---------- orders ----------
+    match /orders/{orderId} {
+      // El cliente dueño del pedido, o el restaurante que lo recibió, pueden leerlo.
+      // El repartidor SOLO lee los pedidos que le pertenecen (driverId == uid); los
+      // disponibles los ve por la proyección redactada availableOrders (sin PII).
+      allow read: if isSignedIn()
+                  && (resource.data.customerId == request.auth.uid
+                      || isRestaurantOwner(resource.data.restaurantId)
+                      || (isDriver()
+                          && resource.data.get('driverId', '') == request.auth.uid));
+
+      // Crear: NADIE crea pedidos desde el cliente. TODOS los pedidos los crea
+      // Cloud Functions con el Admin SDK, recalculando los montos en el servidor:
+      // tarjeta -> createCardCharge (tras cobrar en Openpay); efectivo ->
+      // createCashOrder. Así el cliente no puede manipular total/descuento/cupón (F2).
+      allow create: if false;
+
+      // Cliente: agrega/edita su calificación, o cancela el pedido mientras
+      // sigue en 'pending' (status -> 'cancelled', + cancelledAt).
+      // Restaurante: solo avanza status/estimatedTime/acceptedAt/deliveredAt
+      // (nunca items, montos, dirección o customerId).
+      allow update: if isSignedIn()
+                    && (
+                      (resource.data.customerId == request.auth.uid
+                       && (
+                         // La calificación debe ser un entero de 1 a 5 (F6).
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
+                          && request.resource.data.rating is int
+                          && request.resource.data.rating >= 1
+                          && request.resource.data.rating <= 5)
+                         ||
+                         (resource.data.status == 'pending'
+                          && request.resource.data.status == 'cancelled'
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']))
+                       ))
+                      ||
+                      // Restaurante: edita solo estos campos y, si cambia el status,
+                      // respeta una transición válida (F4). Los edits que no tocan el
+                      // status (estimatedTime, settledAt) siguen permitidos.
+                      (isRestaurantOwner(resource.data.restaurantId)
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'estimatedTime', 'acceptedAt', 'deliveredAt', 'settledAt', 'rejectionReason'])
+                       && (request.resource.data.status == resource.data.status
+                           || validRestaurantTransition(resource.data.status, request.resource.data.status)))
+                      ||
+                      // Repartidor reclama un pedido disponible ('ready' y sin driver).
+                      // Solo fija driverId+assignedAt; el nombre/teléfono los pone una
+                      // Cloud Function desde el perfil real del repartidor (H2).
+                      (isDriver()
+                       && resource.data.status == 'ready'
+                       && resource.data.get('driverId', '') == ''
+                       && request.resource.data.driverId == request.auth.uid
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['driverId', 'assignedAt']))
+                      ||
+                      // Repartidor asignado marca recogido: 'ready' -> 'on_the_way'.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'ready'
+                       && request.resource.data.status == 'on_the_way'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'pickedUpAt']))
+                      ||
+                      // Repartidor asignado marca entregado: 'on_the_way' -> 'delivered'.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'on_the_way'
+                       && request.resource.data.status == 'delivered'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'deliveredAt']))
+                      ||
+                      // Repartidor marca liquidado su propio pedido ya entregado.
+                      (isDriver()
+                       && resource.data.get('driverId', '') == request.auth.uid
+                       && resource.data.status == 'delivered'
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['driverSettledAt']))
+                    );
+
+      allow delete: if false;
+    }
+
+    // ---------- availableOrders (proyección redactada para repartidores) ------
+    // Datos gruesos de los pedidos 'ready' sin repartidor (sin PII del cliente).
+    // La mantiene Cloud Functions (Admin SDK); los repartidores solo la leen.
+    match /availableOrders/{orderId} {
+      allow read: if isDriver();
+      allow write: if false;
+    }
+
+    // ---------- deliveryTracking (ubicación en vivo del repartidor) ----------
+    // Un doc por pedido (id = orderId) con lat/lng/updatedAt. Solo existe mientras
+    // hay una entrega en curso; el repartidor lo borra al entregar (privacidad).
+    match /deliveryTracking/{orderId} {
+      function orderData() {
+        return get(/databases/$(database)/documents/orders/$(orderId)).data;
+      }
+
+      // Escribe el repartidor asignado a ese pedido (verificado contra el pedido).
+      allow create, update: if isDriver()
+                    && request.resource.data.driverId == request.auth.uid
+                    && orderData().driverId == request.auth.uid;
+
+      // Leen: el repartidor, el cliente dueño del pedido y el restaurante receptor.
+      allow read: if isSignedIn()
+                  && (resource.data.driverId == request.auth.uid
+                      || orderData().customerId == request.auth.uid
+                      || isRestaurantOwner(orderData().restaurantId));
+
+      // El repartidor asignado borra el rastro al completar la entrega.
+      allow delete: if isDriver() && orderData().driverId == request.auth.uid;
+    }
+  }
+}

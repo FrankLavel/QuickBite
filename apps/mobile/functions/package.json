@@ -1,0 +1,14 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions de QuickBite (notificaciones de pedidos)",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0",
+    "web-push": "^3.6.7"
+  },
+  "private": true
+}
