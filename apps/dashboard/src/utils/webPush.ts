@@ -47,7 +47,9 @@ export async function subscribeWebPush(uid: string): Promise<void> {
       existing ??
       (await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        // Cast a BufferSource: en TS 5.9 Uint8Array es Uint8Array<ArrayBufferLike>
+        // y ya no encaja directo en la firma de subscribe (el valor es válido).
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
       }));
 
     await updateDoc(doc(db, COLLECTIONS.USERS, uid), {
