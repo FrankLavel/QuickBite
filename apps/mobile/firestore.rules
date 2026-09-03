@@ -53,14 +53,8 @@ service cloud.firestore {
           || (from == 'on_the_way' && to == 'delivered');
     }
 
-    // Compra verificada para reseñas: el pedido existe, es del usuario actual y
-    // está 'delivered'. (No se valida que el producto esté en items[] porque las
-    // reglas no pueden recorrer arrays de maps; eso lo garantiza el cliente.)
-    function orderIsDeliveredForUser(orderId) {
-      return exists(/databases/$(database)/documents/orders/$(orderId))
-             && get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid
-             && get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'delivered';
-    }
+    // (La compra verificada para reseñas la hace ahora la Cloud Function
+    // submitReview, que sí puede recorrer items[]; F7.)
 
     // Campos del perfil que el propio usuario puede editar (nunca role/restaurantId/
     // email/createdAt). 'isAvailable' y 'vehicle' los usa la app del repartidor
