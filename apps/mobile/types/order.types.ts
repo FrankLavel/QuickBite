@@ -1,20 +1,13 @@
 import { Timestamp } from 'firebase/firestore';
+// Enums del contrato de pedido: la fuente de verdad vive en @quickbite/shared (F5).
+import type {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentProvider,
+} from '@quickbite/shared';
 
-export type OrderStatus =
-  | 'pending'
-  | 'accepted'
-  | 'preparing'
-  | 'ready'
-  | 'on_the_way'
-  | 'delivered'
-  | 'rejected' // el restaurante rechaza el pedido
-  | 'cancelled'; // el cliente cancela el pedido (solo mientras está 'pending')
-
-export type PaymentMethod = 'card' | 'paypal' | 'cash';
-
-export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
-
-export type PaymentProvider = 'openpay';
+export type { OrderStatus, PaymentMethod, PaymentStatus, PaymentProvider };
 
 /** Topping ya elegido dentro de un ítem del pedido. */
 export interface OrderItemTopping {

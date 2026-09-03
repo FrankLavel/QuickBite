@@ -13,17 +13,10 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   cancelled: 'Cancelado',
 };
 
-/** Mensaje que ve el cliente por estado (doc móvil). */
-export const ORDER_STATUS_MESSAGE: Record<OrderStatus, string> = {
-  pending: 'Tu pedido está siendo revisado...',
-  accepted: 'Pedido confirmado, en preparación',
-  preparing: 'Tu pedido está en cocina',
-  ready: 'Tu pedido está listo para envío',
-  on_the_way: 'Tu pedido está en camino',
-  delivered: 'Pedido entregado — califica tu pedido',
-  rejected: 'Tu pedido fue rechazado',
-  cancelled: 'Cancelaste este pedido',
-};
+// Mensaje que ve el cliente por estado: fuente de verdad en @quickbite/shared
+// (lo comparten la app y las Cloud Functions). Se re-exporta para no cambiar los
+// imports existentes (F5).
+export { ORDER_STATUS_MESSAGE } from '@quickbite/shared';
 
 /** Color representativo por estado (del sistema de diseño). */
 export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
