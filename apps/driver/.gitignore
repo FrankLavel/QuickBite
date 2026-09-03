@@ -1,0 +1,34 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Carpetas nativas generadas por prebuild (CNG). Se regeneran con expo run:android.
+/android/
+/ios/
+npm-debug.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.env
+.env.local
+# firebase.config.ts NO se ignora: las API keys web de Firebase son públicas por
+# diseño y EAS necesita el archivo para bundlear (si se ignora, el build falla en
+# "Bundle JavaScript" al no resolver ./firebase.config). Igual que quickbite-mobile.
+
+# macOS
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
+
+# Tests
+coverage/
+
+# Firebase (credenciales, no commitear)
+google-services.json
+GoogleService-Info.plist

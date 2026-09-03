@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "QuickBite Driver",
+    "slug": "quickbite-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "quickbitedriver",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#2caf4b"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "QuickBite Driver usa tu ubicación para compartir en tiempo real dónde vas durante una entrega activa."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2caf4b"
+        }
+      ],
+      "expo-font"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.quickbite.driver"
+    },
+    "android": {
+      "package": "com.quickbite.driver",
+      "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f0a5b01-62ec-43e1-9e29-1d8ea18d51d7"
+      }
+    },
+    "owner": "francisco23",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5f0a5b01-62ec-43e1-9e29-1d8ea18d51d7"
+    }
+  }
+}
