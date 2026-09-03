@@ -1,0 +1,14 @@
+{
+  "name": "quickbite",
+  "private": true,
+  "version": "0.0.0",
+  "description": "QuickBite monorepo: app cliente, dashboard, app de repartidor y el contrato de dominio compartido.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

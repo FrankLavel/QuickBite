@@ -1,0 +1,16 @@
+# Dependencias (hoisted en la raíz del workspace)
+node_modules/
+
+# Builds / caches
+dist/
+coverage/
+.expo/
+web-build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.*
+
+# OS
+.DS_Store

@@ -1,0 +1,11 @@
+{
+  "name": "@quickbite/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contrato de dominio compartido de QuickBite (estados de pedido, transiciones y mensajes).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
