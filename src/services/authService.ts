@@ -63,10 +63,41 @@ export async function setAvailability(
   isAvailable: boolean
 ): Promise<void> {
   await updateDoc(doc(db, COLLECTIONS.USERS, uid), { isAvailable });
+  await patchCachedDriver(uid, { isAvailable });
+}
+
+/** Campos del perfil que el repartidor puede editar desde la app. */
+export type EditableProfile = Pick<DriverUser, 'name' | 'phone' | 'vehicle'>;
+
+/**
+ * Actualiza el perfil editable del repartidor (users/{uid}) y refresca la caché
+ * local. Normaliza espacios; teléfono/vehículo vacíos se guardan como ''.
+ */
+export async function updateDriverProfile(
+  uid: string,
+  patch: EditableProfile
+): Promise<EditableProfile> {
+  const clean: EditableProfile = {
+    name: patch.name.trim(),
+    phone: (patch.phone ?? '').trim(),
+    vehicle: (patch.vehicle ?? '').trim(),
+  };
+  await updateDoc(doc(db, COLLECTIONS.USERS, uid), clean);
+  await patchCachedDriver(uid, clean);
+  return clean;
+}
+
+/** Mezcla cambios en el DriverUser cacheado (AsyncStorage), si existe. */
+async function patchCachedDriver(
+  uid: string,
+  patch: Partial<DriverUser>
+): Promise<void> {
   const cached = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_USER);
-  if (cached) {
-    const driver = JSON.parse(cached) as DriverUser;
-    driver.isAvailable = isAvailable;
-    await AsyncStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(driver));
-  }
+  if (!cached) return;
+  const driver = JSON.parse(cached) as DriverUser;
+  if (driver.uid !== uid) return;
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.AUTH_USER,
+    JSON.stringify({ ...driver, ...patch })
+  );
 }

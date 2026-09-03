@@ -18,7 +18,9 @@ import {
   logoutDriver,
   fetchDriverProfile,
   setAvailability,
+  updateDriverProfile,
   NotADriverError,
+  type EditableProfile,
 } from '../services/authService';
 import { clearPushToken } from '../services/pushService';
 import type { DriverUser } from '../types/user';
@@ -29,6 +31,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   toggleAvailability: (value: boolean) => Promise<void>;
+  updateProfile: (patch: EditableProfile) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -73,6 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!driver) return;
         await setAvailability(driver.uid, next);
         setDriver({ ...driver, isAvailable: next });
+      },
+      async updateProfile(patch) {
+        if (!driver) return;
+        const saved = await updateDriverProfile(driver.uid, patch);
+        setDriver({ ...driver, ...saved });
       },
     }),
     [driver, loading]

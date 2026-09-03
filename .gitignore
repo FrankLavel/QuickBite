@@ -16,7 +16,9 @@ npm-debug.*
 *.orig.*
 .env
 .env.local
-firebase.config.ts
+# firebase.config.ts NO se ignora: las API keys web de Firebase son públicas por
+# diseño y EAS necesita el archivo para bundlear (si se ignora, el build falla en
+# "Bundle JavaScript" al no resolver ./firebase.config). Igual que quickbite-mobile.
 
 # macOS
 .DS_Store
@@ -26,3 +28,7 @@ firebase.config.ts
 
 # Tests
 coverage/
+
+# Firebase (credenciales, no commitear)
+google-services.json
+GoogleService-Info.plist

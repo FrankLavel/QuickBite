@@ -34,10 +34,27 @@
     },
     "android": {
       "package": "com.quickbite.driver",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f0a5b01-62ec-43e1-9e29-1d8ea18d51d7"
+      }
+    },
+    "owner": "francisco23",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5f0a5b01-62ec-43e1-9e29-1d8ea18d51d7"
     }
   }
 }
