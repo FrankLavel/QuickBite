@@ -4,9 +4,10 @@
  * reparto (driverId, assignedAt, pickedUpAt) que introduce la app Driver.
  * El contrato completo del pedido vive en las otras apps del ecosistema.
  */
-import type { ORDER_STATUS } from '../utils/constants';
+// Enums del contrato de pedido: fuente de verdad en @quickbite/shared (F5).
+import type { OrderStatus, PaymentMethod, PaymentStatus } from '@quickbite/shared';
 
-export type OrderStatus = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS];
+export type { OrderStatus, PaymentMethod, PaymentStatus };
 
 export interface OrderItemTopping {
   name: string;
@@ -41,8 +42,8 @@ export interface Order {
   discount: number;
   total: number;
   deliveryAddress: DeliveryAddress;
-  paymentMethod: 'card' | 'cash' | 'paypal';
-  paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded';
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
 
   // Denormalizados por la app cliente (para mostrar/contactar).
   customerName?: string;

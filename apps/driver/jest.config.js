@@ -3,6 +3,7 @@ module.exports = {
   preset: 'jest-expo',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@quickbite/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@react-navigation/.*|firebase|@firebase/.*))',
