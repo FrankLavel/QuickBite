@@ -29,10 +29,10 @@ const openpayCfg = () => ({
 });
 
 // --- Web Push (VAPID) para el dashboard del restaurante ----------------------
-// Las llaves viven en functions/.env (gitignored). Para producción conviene
-// mover VAPID_PRIVATE_KEY a Secret Manager.
+// La public key y el subject no son sensibles (env). La PRIVATE key va en Secret
+// Manager: `firebase functions:secrets:set VAPID_PRIVATE_KEY` (F14).
 const VAPID_PUBLIC_KEY = defineString('VAPID_PUBLIC_KEY');
-const VAPID_PRIVATE_KEY = defineString('VAPID_PRIVATE_KEY');
+const VAPID_PRIVATE_KEY = defineSecret('VAPID_PRIVATE_KEY');
 const VAPID_SUBJECT = defineString('VAPID_SUBJECT', {
   default: 'mailto:no-reply@quickbite.app',
 });
@@ -47,6 +47,29 @@ const STATUS_MESSAGE = {
   rejected: 'Tu pedido fue rechazado',
   cancelled: 'Cancelaste este pedido',
 };
+
+/**
+ * Envía mensajes push por Expo en lotes de 100 (límite de la API). Best-effort:
+ * registra los fallos sin lanzar. Acepta un mensaje o un array (F12).
+ */
+async function sendExpoPush(messages) {
+  const list = (Array.isArray(messages) ? messages : [messages]).filter((m) => m && m.to);
+  for (let i = 0; i < list.length; i += 100) {
+    const chunk = list.slice(i, i + 100);
+    try {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(chunk),
+      });
+      if (!res.ok) {
+        console.error('Expo push falló', res.status, await res.text());
+      }
+    } catch (e) {
+      console.error('Expo push error de red', e && e.message);
+    }
+  }
+}
 
 /**
  * Al cambiar el status de un pedido: crea la notificación en Firestore
@@ -88,25 +111,16 @@ exports.onOrderStatusChange = onDocumentUpdated('orders/{orderId}', async (event
   }
   console.log(`Enviando push a ${customerId} (${pushToken.slice(0, 20)}...)`);
 
-  const res = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  await sendExpoPush([
+    {
       to: pushToken,
       sound: 'default',
       title: 'QuickBite',
       body: message,
       data: { orderId },
       channelId: 'default',
-    }),
-  });
-
-  if (!res.ok) {
-    console.error('Expo push falló', res.status, await res.text());
-  }
+    },
+  ]);
 });
 
 /**
@@ -143,14 +157,7 @@ exports.notifyDriversOnReady = onDocumentUpdated('orders/{orderId}', async (even
     channelId: 'default',
   }));
 
-  const res = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(messages),
-  });
-  if (!res.ok) {
-    console.error('Expo push (drivers) falló', res.status, await res.text());
-  }
+  await sendExpoPush(messages);
 });
 
 /**
@@ -217,7 +224,9 @@ exports.denormalizeDriverOnClaim = onDocumentUpdated('orders/{orderId}', async (
  * para alertarlo aunque tenga la pestaña cerrada. La suscripción se guarda en
  * users/{uid}.webPushSubscription desde el dashboard.
  */
-exports.notifyRestaurantOnNewOrder = onDocumentCreated('orders/{orderId}', async (event) => {
+exports.notifyRestaurantOnNewOrder = onDocumentCreated(
+  { document: 'orders/{orderId}', secrets: [VAPID_PRIVATE_KEY] },
+  async (event) => {
   const order = event.data?.data();
   if (!order || !order.restaurantId) return;
 
@@ -319,12 +328,27 @@ exports.onOfferCreated = onDocumentCreated('offers/{offerId}', async (event) => 
   const body =
     offer.title || offer.badge || 'Tienes una nueva oferta disponible';
 
+  // Notificación en Firestore para cada objetivo + push en LOTE (F12): se leen
+  // los perfiles en un solo getAll y los push salen en lotes de 100.
+  const targetSnaps = await db.getAll(
+    ...targets.map((uid) => db.collection('users').doc(uid))
+  );
+  const pushMessages = [];
   await Promise.all(
-    targets.map(async (uid) => {
-      // Notificación en Firestore (pantalla en tiempo real).
-      await db
+    targetSnaps.map((uSnap) => {
+      const token = uSnap.get('pushToken');
+      if (token) {
+        pushMessages.push({
+          to: token,
+          sound: 'default',
+          title: 'QuickBite',
+          body: `${title} — ${body}`,
+          channelId: 'default',
+        });
+      }
+      return db
         .collection('users')
-        .doc(uid)
+        .doc(uSnap.id)
         .collection('notifications')
         .add({
           type: 'promo',
@@ -333,28 +357,9 @@ exports.onOfferCreated = onDocumentCreated('offers/{offerId}', async (event) => 
           isRead: false,
           createdAt: FieldValue.serverTimestamp(),
         });
-
-      // Push al token Expo del cliente (si lo tiene registrado).
-      const uSnap = await db.collection('users').doc(uid).get();
-      const pushToken = uSnap.get('pushToken');
-      if (!pushToken) return;
-
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: pushToken,
-          sound: 'default',
-          title: 'QuickBite',
-          body: `${title} — ${body}`,
-          channelId: 'default',
-        }),
-      });
-      if (!res.ok) {
-        console.error('Expo push (promo) falló', res.status, await res.text());
-      }
     })
   );
+  await sendExpoPush(pushMessages);
 });
 
 /**
