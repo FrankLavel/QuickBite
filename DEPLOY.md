@@ -160,3 +160,39 @@ firebase functions:log --only createCashOrder,submitReview,notifyRestaurantOnNew
 [ ] npm run deploy                          (apps/dashboard)
 [ ] Smoke test (efectivo, tarjeta, cupón, estados, reseña, push)
 ```
+
+---
+
+## Despliegue automático (CI/CD) — F15
+
+El workflow `.github/workflows/deploy.yml` despliega a Firebase desde GitHub
+Actions, respetando el orden **funciones → reglas → hosting**. Por defecto es
+**manual** (no despliega en cada push).
+
+### Configuración (una sola vez)
+
+1. **Secreto de deploy.** Genera un token y añádelo al repo:
+   ```bash
+   firebase login:ci        # imprime un token
+   ```
+   GitHub → Settings → Secrets and variables → Actions → New repository secret:
+   nombre `FIREBASE_TOKEN`, valor = el token.
+   *(Alternativa recomendada a futuro: cuenta de servicio con roles de Firebase
+   Admin / Cloud Functions Admin / Secret Manager Accessor y
+   `GOOGLE_APPLICATION_CREDENTIALS`.)*
+
+2. **Secretos de Functions** ya en Secret Manager (OPENPAY_*, VAPID_PRIVATE_KEY).
+
+3. **(Recomendado) Aprobación humana.** GitHub → Settings → Environments → crea
+   `production` y activa **Required reviewers**. Así cada deploy espera tu OK.
+
+### Uso
+
+- **Manual:** pestaña **Actions → Deploy → Run workflow**, y elige el target
+  (`all`, `functions-and-rules` o `hosting`).
+- **Automático tras CI verde:** descomenta el bloque `workflow_run` en
+  `deploy.yml`. Con el Environment `production` protegido, cada merge a `main`
+  que pase el CI **propone** un deploy que tú apruebas.
+
+> El deploy usa el mismo orden seguro que este runbook (funciones antes que
+> reglas) y `--force` en funciones para no colgarse en prompts de CI.

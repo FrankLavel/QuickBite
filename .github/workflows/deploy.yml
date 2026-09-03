@@ -1,0 +1,90 @@
+name: Deploy
+
+# Despliegue a Firebase (producción). Por defecto MANUAL desde la pestaña
+# Actions (botón "Run workflow") para no desplegar en cada push sin querer.
+#
+# Requisitos antes de usarlo (una sola vez):
+#   1. Secreto FIREBASE_TOKEN en el repo (Settings → Secrets and variables →
+#      Actions). Generalo con:  firebase login:ci
+#      (Alternativa recomendada a futuro: cuenta de servicio + GOOGLE_APPLICATION_CREDENTIALS.)
+#   2. Los secretos de las Functions deben existir en Secret Manager
+#      (OPENPAY_PRIVATE_KEY, OPENPAY_WEBHOOK_USER/PASS, VAPID_PRIVATE_KEY).
+#   3. (Recomendado) Configurar el Environment "production" con "Required
+#      reviewers" para exigir aprobación humana antes de cada deploy.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Qué desplegar"
+        type: choice
+        default: all
+        options:
+          - all
+          - functions-and-rules
+          - hosting
+  # --- Auto-deploy tras CI verde en main (opcional) ---
+  # Descomenta este bloque cuando tengas el secreto y el environment listos.
+  # workflow_run:
+  #   workflows: ["CI"]
+  #   types: [completed]
+  #   branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy a Firebase
+    runs-on: ubuntu-latest
+    # Manual siempre; si activas workflow_run, solo cuando el CI pasó.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    environment: production
+    env:
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      PROJECT: quickbite-6dee7
+      TARGET: ${{ github.event.inputs.target || 'all' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install (workspaces)
+        run: npm ci
+
+      - name: Install functions deps
+        if: env.TARGET != 'hosting'
+        run: npm --prefix apps/mobile/functions ci
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools
+
+      # ---- Backend: FUNCIONES primero (las reglas dependen de ellas) ----
+      - name: Deploy Cloud Functions
+        if: env.TARGET != 'hosting'
+        working-directory: apps/mobile
+        run: firebase deploy --only functions --project "$PROJECT" --non-interactive --force
+
+      - name: Deploy Security Rules
+        if: env.TARGET != 'hosting'
+        working-directory: apps/mobile
+        run: firebase deploy --only firestore:rules,storage --project "$PROJECT" --non-interactive
+
+      # ---- Dashboard (Hosting) ----
+      - name: Build dashboard (web)
+        if: env.TARGET != 'functions-and-rules'
+        working-directory: apps/dashboard
+        run: npx expo export --platform web
+
+      - name: Deploy Hosting
+        if: env.TARGET != 'functions-and-rules'
+        working-directory: apps/dashboard
+        run: firebase deploy --only hosting --project "$PROJECT" --non-interactive
