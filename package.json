@@ -1,7 +1,7 @@
 {
   "name": "quickbite",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "description": "QuickBite monorepo: app cliente, dashboard, app de repartidor y el contrato de dominio compartido.",
   "workspaces": [
     "apps/*",
